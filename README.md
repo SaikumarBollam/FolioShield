@@ -1,4 +1,4 @@
-# 🛡️ LlamaShield: Autonomous Chargeback Defense & Evidence Builder
+# 🛡️ FolioShield: Autonomous Chargeback Defense & Evidence Builder
 
 > **Meta Llama Hackathon Submission** — Track: Build for Your World
 
