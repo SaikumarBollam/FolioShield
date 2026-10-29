@@ -18,6 +18,8 @@ from core.llm_engine import LlamaEngine
 from core.audit_logger import AuditLogger
 from core.pdf_generator import EvidencePacketGenerator
 from core.config import get_settings
+from core.client import FolioShield
+from core.models import NoticeData, FolioData
 from data.sample_scenarios import SCENARIOS
 
 
@@ -169,16 +171,23 @@ class TestFolioShieldPipeline(unittest.TestCase):
 
     def test_10_environment_configuration_modes(self):
         """Validates environment-driven config switching between testing and production."""
-        test_cfg = get_settings(env_override="testing")
-        self.assertTrue(test_cfg.is_testing)
-        self.assertFalse(test_cfg.is_production)
-        self.assertTrue(test_cfg.enable_test_scenarios)
-        self.assertTrue(test_cfg.show_debug_details)
+        # Temporarily clear override to test environment defaults
+        old_val = os.environ.pop("ENABLE_TEST_SCENARIOS", None)
+        try:
+            test_cfg = get_settings(env_override="testing")
+            self.assertTrue(test_cfg.is_testing)
+            self.assertFalse(test_cfg.is_production)
+            self.assertTrue(test_cfg.enable_test_scenarios)
+            self.assertTrue(test_cfg.show_debug_details)
 
-        prod_cfg = get_settings(env_override="production")
-        self.assertTrue(prod_cfg.is_production)
-        self.assertFalse(prod_cfg.is_testing)
-        self.assertEqual(prod_cfg.environment, "production")
+            prod_cfg = get_settings(env_override="production")
+            self.assertTrue(prod_cfg.is_production)
+            self.assertFalse(prod_cfg.is_testing)
+            self.assertFalse(prod_cfg.enable_test_scenarios)
+            self.assertEqual(prod_cfg.environment, "production")
+        finally:
+            if old_val is not None:
+                os.environ["ENABLE_TEST_SCENARIOS"] = old_val
 
     def test_11_upload_size_limit_validation(self):
         """Validates configurable upload size threshold."""
@@ -187,6 +196,78 @@ class TestFolioShieldPipeline(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             validate_upload(mock_pdf, "large.pdf", max_bytes=small_limit)
         self.assertIn("limit is", str(ctx.exception))
+
+    def test_12_sdk_library_integration(self):
+        """Validates programmatic SDK library integration for PMS/BMS."""
+        fs = FolioShield()
+        scenario = SCENARIOS["visa_fraud_10_4"]
+
+        # 1. Test NoticeData and FolioData model binding
+        notice = NoticeData.from_dict(scenario["notice"])
+        folio = FolioData.from_dict(scenario["folio"])
+        self.assertEqual(notice.case_id, "V-DISP-89214-X")
+        self.assertEqual(folio.room_number, "412")
+
+        # 2. Test programmatic reconciliation
+        recon = fs.reconcile(notice, folio, supporting_docs=scenario["supporting_docs"])
+        self.assertTrue(recon["is_exact_match"])
+        self.assertGreaterEqual(recon["completeness_score"], 80)
+
+        # 3. Test programmatic full pipeline dispute response
+        result = fs.process_dispute(
+            notice=notice,
+            folio=folio,
+            supporting_docs=scenario["supporting_docs"],
+            reviewer_name="Automated PMS Unit Test",
+            generate_pdf=True
+        )
+        self.assertIsNotNone(result.rebuttal_text)
+        self.assertIsNotNone(result.pdf_base64)
+        self.assertIsNotNone(result.sha256_digest)
+        self.assertTrue(len(result.pdf_base64) > 1000)
+
+    def test_13_api_server_handler_dispatch(self):
+        """Validates zero-dependency HTTP API request handler dispatch directly."""
+        from core.api import FolioShieldAPIHandler
+        import io
+        import json
+
+        scenario = SCENARIOS["visa_fraud_10_4"]
+
+        # 1. Test GET /health
+        class MockSocket:
+            def __init__(self, data: bytes):
+                self.rfile = io.BytesIO(data)
+                self.wfile = io.BytesIO()
+
+            def makefile(self, mode, *args, **kwargs):
+                if "b" in mode:
+                    return self.rfile if "r" in mode else self.wfile
+                return io.StringIO(self.rfile.getvalue().decode())
+
+            def sendall(self, b):
+                self.wfile.write(b)
+
+        # Test request handler directly via dispatch
+        req_payload = json.dumps({
+            "notice": scenario["notice"],
+            "folio": scenario["folio"],
+            "supporting_docs": scenario["supporting_docs"]
+        })
+        raw_http = (
+            f"POST /api/v1/reconcile HTTP/1.1\r\n"
+            f"Host: localhost\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Length: {len(req_payload)}\r\n\r\n"
+            f"{req_payload}"
+        ).encode("utf-8")
+
+        mock_sock = MockSocket(raw_http)
+        handler = FolioShieldAPIHandler(mock_sock, ("127.0.0.1", 12345), None)
+        output_bytes = mock_sock.wfile.getvalue()
+        self.assertIn(b"200 OK", output_bytes)
+        self.assertIn(b'"status": "success"', output_bytes)
+        self.assertIn(b'"is_exact_match": true', output_bytes)
 
 
 if __name__ == "__main__":

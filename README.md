@@ -49,6 +49,13 @@ Potential inputs include:
 
 **Important:** Generated rebuttals are drafts for human review, not guaranteed legal advice or confirmation of compliance with card-network rules. Reason codes and evidence requirements must be validated against the applicable processor and current network documentation.
 
+### 🔌 5. API-Based & Python Library Integration (BMS / PMS)
+
+In addition to the interactive web portal, FolioShield provides a **direct Python SDK library** and a **zero-dependency REST API server** to integrate directly with existing Building Management Systems (BMS), Property Management Systems (Oracle OPERA, Cloudbeds, Mews), accounting ERPs, and automated dispute webhooks.
+
+- **Python SDK (`FolioShield`)**: Embed FolioShield inside existing backend services with typed `NoticeData` and `FolioData` schemas.
+- **REST API Server (`core.api`)**: Headless endpoints for automated reconciliation, rebuttal drafting, and 3-page PDF generation.
+
 ### 📑 4. One-Click PDF Evidence Packet
 
 Generate a downloadable, three-page dispute evidence packet using ReportLab.
