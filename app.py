@@ -24,12 +24,13 @@ from core.pdf_generator import EvidencePacketGenerator
 from core.reconciler import Reconciler
 from core.rules import SUPPORTING_DOC_TYPES
 from core.security import validate_upload
+from core.config import config
 from data.sample_scenarios import SCENARIOS
 
 load_dotenv()
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logging.basicConfig(level=config.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
-DEFAULT_MERCHANT = os.getenv("FOLIOSHIELD_MERCHANT_NAME", "Grand Horizon Resort & Suites")
+DEFAULT_MERCHANT = config.merchant_name
 CARD_NETWORKS = ["Visa", "Mastercard", "American Express", "Discover"]
 PROVIDER_OPTIONS = {
     "Offline / Template Mode": OFFLINE_PROVIDER,
@@ -43,7 +44,7 @@ SCENARIO_OPTIONS = {
     "amex_partial_c08": "Amex C08: Partial Incidental ($245.00)",
     "custom": "📂 Custom Document Upload",
 }
-DEFAULT_SCENARIO = "visa_fraud_10_4"
+DEFAULT_SCENARIO = "visa_fraud_10_4" if config.enable_test_scenarios else "custom"
 
 
 # -----------------------------------------------------------------------------
@@ -159,25 +160,37 @@ init_state()
 with st.sidebar:
     st.markdown("## 🛡️ **FolioShield**")
     st.caption("**Autonomous Chargeback Defense & Evidence Builder**\n*Meta Llama Hackathon Submission*")
+    
+    # Environment Badge
+    if config.is_production:
+        st.markdown("<span class='badge' style='background-color:#DCFCE7; color:#15803D;'>🟢 PRODUCTION ENVIRONMENT</span>", unsafe_allow_html=True)
+    elif config.is_testing:
+        st.markdown("<span class='badge' style='background-color:#FEF3C7; color:#B45309;'>🧪 TESTING ENVIRONMENT</span>", unsafe_allow_html=True)
+    else:
+        st.markdown("<span class='badge' style='background-color:#E0E7FF; color:#4338CA;'>🛠️ DEVELOPMENT ENVIRONMENT</span>", unsafe_allow_html=True)
     st.markdown("---")
 
-    st.markdown("### ⚡ **Test Scenario Quick-Loader**")
-    selected_scenario = st.selectbox(
-        "Choose test scenario or custom upload:",
-        options=list(SCENARIO_OPTIONS.keys()),
-        format_func=SCENARIO_OPTIONS.get,
-        index=list(SCENARIO_OPTIONS).index(st.session_state.current_scenario_key),
-    )
-    if selected_scenario != st.session_state.current_scenario_key:
-        st.session_state.current_scenario_key = selected_scenario
-        if selected_scenario == "custom":
-            load_case(empty_notice(), empty_folio(), {})
-            log("custom_case_started", {"message": "Cleared case for custom document upload"})
-        else:
-            s_data = SCENARIOS[selected_scenario]
-            load_case(s_data["notice"], s_data["folio"], s_data["supporting_docs"])
-            log("scenario_loaded", {"scenario": selected_scenario, "message": f"Loaded {s_data['title']}"})
-        st.rerun()
+    if config.enable_test_scenarios:
+        st.markdown("### ⚡ **Test Scenario Quick-Loader**")
+        selected_scenario = st.selectbox(
+            "Choose test scenario or custom upload:",
+            options=list(SCENARIO_OPTIONS.keys()),
+            format_func=SCENARIO_OPTIONS.get,
+            index=list(SCENARIO_OPTIONS).index(st.session_state.current_scenario_key),
+        )
+        if selected_scenario != st.session_state.current_scenario_key:
+            st.session_state.current_scenario_key = selected_scenario
+            if selected_scenario == "custom":
+                load_case(empty_notice(), empty_folio(), {})
+                log("custom_case_started", {"message": "Cleared case for custom document upload"})
+            else:
+                s_data = SCENARIOS[selected_scenario]
+                load_case(s_data["notice"], s_data["folio"], s_data["supporting_docs"])
+                log("scenario_loaded", {"scenario": selected_scenario, "message": f"Loaded {s_data['title']}"})
+            st.rerun()
+    else:
+        st.markdown("### 📂 **Live Document Intake**")
+        st.caption("Active: Upload live guest dispute notices and folios in Tab 1 (test scenarios disabled in production).")
 
     st.markdown("---")
     st.markdown("### 👤 **Reviewer**")
@@ -187,7 +200,7 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### 🤖 **Meta Llama AI Engine**")
-    env_provider = os.getenv("LLAMA_PROVIDER", OFFLINE_PROVIDER).lower()
+    env_provider = config.llama_provider
     provider_labels = list(PROVIDER_OPTIONS)
     default_label = next((lbl for lbl, code in PROVIDER_OPTIONS.items() if code == env_provider), provider_labels[0])
     provider_label = st.selectbox("Inference Provider:", options=provider_labels, index=provider_labels.index(default_label))
@@ -196,11 +209,13 @@ with st.sidebar:
     api_key_input = ""
     if provider_code != OFFLINE_PROVIDER:
         env_var = PROVIDERS[provider_code].api_key_env
+        configured_key = config.get_api_key_for_provider(provider_code)
         api_key_input = st.text_input(
             "Provider API Key:",
+            value=configured_key or "",
             type="password",
             placeholder=f"Leave blank to use ${env_var}",
-            help="Keys are held in memory for this session only and are never written to logs or packets.",
+            help="Keys can be set in .env or passed here for this session.",
         )
 
     llama_engine = LlamaEngine(provider=provider_code, api_key=api_key_input or None)
@@ -301,7 +316,7 @@ with tab_ingest:
             notice_bytes = notice_file.getvalue()
             if new_upload("notice", notice_bytes):
                 try:
-                    validate_upload(notice_bytes, notice_file.name)
+                    validate_upload(notice_bytes, notice_file.name, max_bytes=config.max_upload_bytes)
                     parsed_notice = DocumentExtractor.parse_dispute_notice(DocumentExtractor.extract_text_from_pdf(notice_bytes))
                 except (ExtractionError, ValueError) as e:
                     st.session_state.processed_uploads.pop("notice", None)
@@ -320,11 +335,12 @@ with tab_ingest:
             st.success(f"✓ Notice ingested: Case #{notice_data.get('case_id') or 'not detected'} "
                        f"(${float(notice_data.get('disputed_amount') or 0):,.2f})")
 
-        with st.expander("View Ingested Notice Details", expanded=True):
-            st.json({k: v for k, v in notice_data.items() if k != "raw_text"})
-        if notice_data.get("raw_text"):
-            with st.expander("View extracted notice text (card numbers masked)"):
-                st.code(notice_data["raw_text"][:5000], language=None)
+        if config.show_debug_details:
+            with st.expander("View Ingested Notice Details", expanded=False):
+                st.json({k: v for k, v in notice_data.items() if k != "raw_text"})
+            if notice_data.get("raw_text"):
+                with st.expander("View extracted notice text (card numbers masked)"):
+                    st.code(notice_data["raw_text"][:5000], language=None)
 
     with c_up2:
         st.markdown("#### 2. Hotel Guest Folio (PDF or CSV)")
@@ -333,7 +349,7 @@ with tab_ingest:
             folio_bytes = folio_file.getvalue()
             if new_upload("folio", folio_bytes):
                 try:
-                    validate_upload(folio_bytes, folio_file.name)
+                    validate_upload(folio_bytes, folio_file.name, max_bytes=config.max_upload_bytes)
                     if folio_file.name.lower().endswith(".csv"):
                         parsed_folio = DocumentExtractor.parse_folio_csv(folio_bytes)
                     else:
@@ -355,8 +371,9 @@ with tab_ingest:
             st.success(f"✓ Folio parsed: Room #{folio_data.get('room_number') or 'N/A'} "
                        f"(${float(folio_data.get('total_charges') or 0):,.2f})")
 
-        with st.expander("View Ingested Folio Details", expanded=True):
-            st.json({k: v for k, v in folio_data.items() if k not in ("line_items", "raw_text")})
+        if config.show_debug_details:
+            with st.expander("View Ingested Folio Details", expanded=False):
+                st.json({k: v for k, v in folio_data.items() if k not in ("line_items", "raw_text")})
 
     # --- Human review of extracted fields -------------------------------------------------
     with st.expander("✏️ Review & Correct Stay Details (Guest Name, Dates, Room #)", expanded=False):
@@ -421,7 +438,7 @@ with tab_ingest:
             st.session_state.vision_image_hash = img_hash
             st.session_state.vision_audit_result = None
         try:
-            validate_upload(img_bytes, img_file.name)
+            validate_upload(img_bytes, img_file.name, max_bytes=config.max_upload_bytes)
         except ValueError as e:
             st.error(f"❌ {e}")
         else:

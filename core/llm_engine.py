@@ -22,6 +22,7 @@ import requests
 
 from .rules import SUPPORTING_DOC_TYPES
 from .security import sanitize_untrusted_text
+from .config import config
 
 logger = logging.getLogger(__name__)
 
@@ -107,9 +108,9 @@ class LlamaEngine:
     """
 
     def __init__(self, provider: Optional[str] = None, api_key: Optional[str] = None):
-        self.provider = (provider or os.getenv("LLAMA_PROVIDER", OFFLINE_PROVIDER)).strip().lower()
+        self.provider = (provider or config.llama_provider or OFFLINE_PROVIDER).strip().lower()
         self.config: Optional[ProviderConfig] = PROVIDERS.get(self.provider)
-        env_key = os.getenv(self.config.api_key_env) if self.config else None
+        env_key = config.get_api_key_for_provider(self.provider) or (os.getenv(self.config.api_key_env) if self.config else None)
         self.api_key = (api_key or env_key or "").strip()
         self.last_engine_used = "template"
 
@@ -168,18 +169,19 @@ class LlamaEngine:
     # ------------------------------------------------------------------ provider calls
 
     def _text_model(self) -> str:
-        return os.getenv("LLAMA_TEXT_MODEL") or self.config.text_model  # type: ignore[union-attr]
+        return config.llama_text_model or os.getenv("LLAMA_TEXT_MODEL") or self.config.text_model  # type: ignore[union-attr]
 
     def _vision_model(self) -> str:
-        return os.getenv("LLAMA_VISION_MODEL") or self.config.vision_model  # type: ignore[union-attr]
+        return config.llama_vision_model or os.getenv("LLAMA_VISION_MODEL") or self.config.vision_model  # type: ignore[union-attr]
 
     def _post(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         assert self.config is not None
+        timeout = config.request_timeout_seconds or REQUEST_TIMEOUT_SECONDS
         res = requests.post(
             self.config.url,
             headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
             json=payload,
-            timeout=REQUEST_TIMEOUT_SECONDS,
+            timeout=timeout,
         )
         if res.status_code != 200:
             # Do not log the response body verbatim: it may echo request content.

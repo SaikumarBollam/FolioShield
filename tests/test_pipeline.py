@@ -17,6 +17,7 @@ from core.reconciler import Reconciler, parse_date
 from core.llm_engine import LlamaEngine
 from core.audit_logger import AuditLogger
 from core.pdf_generator import EvidencePacketGenerator
+from core.config import get_settings
 from data.sample_scenarios import SCENARIOS
 
 
@@ -165,6 +166,27 @@ class TestFolioShieldPipeline(unittest.TestCase):
 
         reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
         self.assertEqual(len(reader.pages), 3)
+
+    def test_10_environment_configuration_modes(self):
+        """Validates environment-driven config switching between testing and production."""
+        test_cfg = get_settings(env_override="testing")
+        self.assertTrue(test_cfg.is_testing)
+        self.assertFalse(test_cfg.is_production)
+        self.assertTrue(test_cfg.enable_test_scenarios)
+        self.assertTrue(test_cfg.show_debug_details)
+
+        prod_cfg = get_settings(env_override="production")
+        self.assertTrue(prod_cfg.is_production)
+        self.assertFalse(prod_cfg.is_testing)
+        self.assertEqual(prod_cfg.environment, "production")
+
+    def test_11_upload_size_limit_validation(self):
+        """Validates configurable upload size threshold."""
+        small_limit = 1024  # 1 KB limit
+        mock_pdf = b"%PDF-1.4" + (b"0" * 2048)  # 2 KB file
+        with self.assertRaises(ValueError) as ctx:
+            validate_upload(mock_pdf, "large.pdf", max_bytes=small_limit)
+        self.assertIn("limit is", str(ctx.exception))
 
 
 if __name__ == "__main__":

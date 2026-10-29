@@ -10,7 +10,8 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+from .config import config
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +23,8 @@ class AuditLogger:
     Maintains a tamper-evident (hash-chained), timestamped log of all dispute actions.
     """
 
-    def __init__(self, log_dir: str = "logs"):
-        self.log_dir = log_dir
+    def __init__(self, log_dir: Optional[str] = None):
+        self.log_dir = log_dir or config.log_dir
         os.makedirs(self.log_dir, exist_ok=True)
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         self.session_id = f"disp_{stamp}_{uuid.uuid4().hex[:8]}"

@@ -4,7 +4,7 @@ PCI-DSS credit card masking, PII scrubbing, upload validation, and prompt inject
 """
 
 import re
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from xml.sax.saxutils import escape as _xml_escape
 
 # Regex to detect 13-19 digit card numbers (Visa, Mastercard, Amex, Discover)
@@ -110,17 +110,18 @@ def escape_markup(value: Any) -> str:
     return _xml_escape("" if value is None else str(value))
 
 
-def validate_upload(file_bytes: bytes, filename: str) -> None:
+def validate_upload(file_bytes: bytes, filename: str, max_bytes: Optional[int] = None) -> None:
     """
     Validates an uploaded file's size and (for binary formats) magic-byte signature.
     Raises ValueError with a user-facing message if the file is rejected.
     """
+    limit = max_bytes if max_bytes is not None else MAX_UPLOAD_BYTES
     if not file_bytes:
         raise ValueError(f"'{filename}' is empty.")
-    if len(file_bytes) > MAX_UPLOAD_BYTES:
+    if len(file_bytes) > limit:
         raise ValueError(
             f"'{filename}' is {len(file_bytes) / 1_048_576:.1f} MB; "
-            f"the limit is {MAX_UPLOAD_BYTES // 1_048_576} MB."
+            f"the limit is {limit // 1_048_576} MB."
         )
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     signatures = _MAGIC_BYTES.get(ext)

@@ -225,15 +225,40 @@ source .venv/bin/activate
 Install the core dependencies:
 
 ```bash
-pip install streamlit pandas pdfplumber pypdf reportlab
+pip install -r requirements.txt
 ```
 
-Configure your model provider according to its official SDK and authentication documentation.
+### Configuration (`.env`)
 
-Launch the application once `app.py` and the required configuration are implemented:
+Copy the environment template to create your active `.env`:
+
+```bash
+cp .env.example .env
+```
+
+Configure variables based on your deployment mode:
+
+| Variable | Testing Mode (`ENVIRONMENT=testing`) | Production Mode (`ENVIRONMENT=production`) |
+|---|---|---|
+| `ENVIRONMENT` | `testing` | `production` |
+| `LLAMA_PROVIDER` | `mock` (Offline deterministic rules, zero keys needed) | `groq`, `together`, or `openrouter` |
+| `GROQ_API_KEY` | *(optional)* | `gsk_...` |
+| `ENABLE_TEST_SCENARIOS` | `true` (Shows scenario quick-loader) | `false` (Direct intake for real dispute notices) |
+| `SHOW_DEBUG_DETAILS` | `true` (Inspect raw OCR & regex text) | `false` (Clean front-desk staff view) |
+| `MAX_UPLOAD_SIZE_MB` | `10` | `10` |
+
+### Running the Application
+
+Launch the Streamlit web application:
 
 ```bash
 streamlit run app.py
+```
+
+Run automated tests across the entire pipeline:
+
+```bash
+python -m unittest discover tests
 ```
 
 > **Implementation note:** These commands establish the initial environment. A complete runnable application also requires the application source files, model-provider integration, and any additional dependencies used by the implementation.
