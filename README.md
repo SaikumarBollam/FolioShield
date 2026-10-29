@@ -2,9 +2,9 @@
 
 > **Meta Llama Hackathon Submission** — Track: Build for Your World
 
-LlamaShield is an AI-powered financial defense engine designed to help hotels respond to credit card chargebacks by turning unstructured bank dispute notices and guest transaction records into organized dispute evidence packets.
+FolioShield is an AI-powered financial defense engine designed to help hotels respond to credit card chargebacks by turning unstructured bank dispute notices and guest transaction records into organized dispute evidence packets.
 
-Operating with an **outside-in, document-first approach**, LlamaShield requires no direct integration with legacy Property Management Systems (PMS). It uses Meta Llama models to extract relevant information, analyze supporting evidence, draft dispute rebuttals, and generate a downloadable, three-page PDF evidence packet.
+Operating with an **outside-in, document-first approach**, FolioShield requires no direct integration with legacy Property Management Systems (PMS). It uses Meta Llama models to extract relevant information, analyze supporting evidence, draft dispute rebuttals, and generate a downloadable, three-page PDF evidence packet.
 
 ## 🎯 The Problem
 
@@ -17,7 +17,7 @@ Key challenges include:
 - 🔌 **Disconnected Legacy Systems:** Hotel operations often involve multiple systems, making manual reconciliation time-consuming.
 - 📄 **Fragmented Evidence:** Relevant receipts, transaction records, cancellation policies, and check-in documentation may be stored in different formats.
 
-LlamaShield addresses these challenges by automating document processing, evidence organization, and the preparation of dispute response materials.
+FolioShield addresses these challenges by automating document processing, evidence organization, and the preparation of dispute response materials.
 
 ## ✨ Key Features
 
@@ -66,28 +66,68 @@ The packet is designed to help staff prepare a response for submission through t
 
 ```mermaid
 flowchart TD
-    A[User Uploads Documents] --> B[Document Validation]
+    A["Staff Uploads Documents"] --> B["Document Validation & Sanitization"]
 
-    B --> C[Bank Dispute Notice PDF]
-    B --> D[Guest Folio PDF / CSV / Image]
+    B --> C["Bank Dispute Notice (PDF)"]
+    B --> D["Guest Folio (PDF / CSV)"]
+    B --> V["Scanned Receipt / Registration Card (Image)"]
 
-    C --> E[Document Extraction Pipeline]
+    C --> E["Document Extraction Pipeline (pdfplumber, pypdf)"]
     D --> E
+    V --> G["Llama 3.2 / 4 Vision Analysis"]
 
-    E --> F[Text and Table Extraction]
-    E --> G[Llama 3.2 Vision]
-
-    F --> H[Evidence Normalization]
+    E --> H["Evidence Normalization & PCI-DSS Masking"]
     G --> H
 
-    H --> I[Transaction Matching and Audit]
-    I --> J[Evidence Completeness Checks]
+    H --> I["Transaction Matching & Mathematical Audit"]
+    I --> J["Card Network Rule Lookup & Completeness Checks"]
 
-    J --> K[Llama 3.3 70B]
-    K --> L[Human Review and Approval]
+    J --> K["Meta Llama 3.3 70B Rebuttal Engine / Offline Rules"]
+    K --> L{"Named Reviewer Approval Gate"}
+    L -- "Edit / Refine" --> K
+    L -- "Approved" --> M["ReportLab 3-Page Evidence Generator"]
 
-    L --> M[ReportLab PDF Generation]
-    M --> N[Downloadable Dispute Evidence Packet]
+    M --> N["Downloadable Dispute Evidence Packet (PDF)"]
+
+    A -. Hash Chain .-> LOG[("Tamper-Evident Audit Trail")]
+    L -. Hash Chain .-> LOG
+    M -. Hash Chain .-> LOG
+```
+
+### End-to-End Sequence
+
+```mermaid
+sequenceDiagram
+    actor Staff as Hotel Staff Reviewer
+    participant UI as Streamlit UI
+    participant Ext as Document Extractor
+    participant Rec as Reconciler
+    participant LLM as Meta Llama Engine
+    participant PDF as ReportLab PDF Engine
+    participant Log as Hash-Chained Audit Trail
+
+    Staff->>UI: Upload Notice & Folio (+ Optional Scanned Exhibit)
+    UI->>Ext: Extract and sanitize text/tables
+    Ext-->>UI: Normalized Case & Folio Data
+    UI->>Log: Record upload events & file SHA-256
+
+    Staff->>UI: Review extracted fields & toggle available evidence
+    UI->>Rec: Run audit & completeness scoring
+    Rec-->>UI: Discrepancy flags, days to deadline, checklist
+
+    Staff->>UI: Trigger Rebuttal Drafting
+    UI->>LLM: Case facts + Reviewer notes (fenced prompt)
+    LLM-->>UI: Tailored representment defense letter
+    UI->>Log: Record drafting event
+
+    Staff->>UI: Refine and formally approve rebuttal
+    UI->>Log: Record reviewer approval & text hash
+
+    Staff->>UI: Compile Evidence Packet
+    UI->>PDF: Generate 3-page PDF (shrink-to-fit)
+    PDF-->>UI: Validated 3-page PDF bytes
+    UI->>Log: Record compilation event & PDF digest
+    UI-->>Staff: One-click PDF download
 ```
 
 ### Pipeline Components
@@ -133,7 +173,7 @@ flowchart TD
 
 ## 🔐 Security, Reliability & Responsible AI
 
-LlamaShield processes financial and potentially sensitive guest information. A production implementation should include:
+FolioShield processes financial and potentially sensitive guest information. A production implementation should include:
 
 - Secure file validation and temporary-file handling.
 - Access controls and least-privilege permissions.
@@ -161,7 +201,7 @@ Clone the repository:
 
 ```bash
 git clone https://github.com/SaikumarBollam/FolioShield.git
-cd llamashield
+cd FolioShield
 ```
 
 Create and activate a virtual environment:
@@ -200,14 +240,14 @@ streamlit run app.py
 
 ## 🗺️ Roadmap
 
-- [ ] Implement document upload and validation.
-- [ ] Extract structured transaction information from PDFs and CSV files.
-- [ ] Integrate Meta Llama 3.2 Vision for supported scanned documents.
-- [ ] Integrate Meta Llama 3.3 70B for evidence-based rebuttal drafting.
-- [ ] Add transaction reconciliation and evidence completeness checks.
-- [ ] Implement the three-page PDF evidence packet.
-- [ ] Add human review and approval controls.
-- [ ] Add secure file handling, audit logging, and automated tests.
+- [x] Implement document upload and validation.
+- [x] Extract structured transaction information from PDFs and CSV files.
+- [x] Integrate Meta Llama 3.2 Vision for supported scanned documents.
+- [x] Integrate Meta Llama 3.3 70B for evidence-based rebuttal drafting.
+- [x] Add transaction reconciliation and evidence completeness checks.
+- [x] Implement the three-page PDF evidence packet.
+- [x] Add human review and approval controls.
+- [x] Add secure file handling, audit logging, and automated tests.
 - [ ] Validate generated packets against real processor submission requirements.
 
 ## 📊 Success Metrics
@@ -226,7 +266,7 @@ These metrics should be measured against a representative, human-verified test d
 
 ## ⚖️ Disclaimer
 
-LlamaShield is an evidence preparation and decision-support tool. It does not guarantee chargeback reversals, legal compliance, or acceptance of generated documents by banks, payment processors, or card networks.
+FolioShield is an evidence preparation and decision-support tool. It does not guarantee chargeback reversals, legal compliance, or acceptance of generated documents by banks, payment processors, or card networks.
 
 All generated content should be reviewed by an authorized person before submission. Applicable deadlines, dispute reason codes, evidence requirements, and submission procedures must be verified with the relevant payment processor.
 
