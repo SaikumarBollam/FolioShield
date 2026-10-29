@@ -275,22 +275,22 @@ with m5:
 st.markdown("<br/>", unsafe_allow_html=True)
 
 tab_ingest, tab_audit, tab_rebuttal, tab_pdf, tab_logs = st.tabs([
-    "📄 1. Document Ingestion & Vision",
-    "🔍 2. Reconciliation Audit",
-    "⚖️ 3. Rebuttal Studio (Human-in-the-Loop)",
-    "📑 4. Three-Page Evidence Packet",
-    "🔒 5. Audit Log & Compliance",
+    "📄 1. Upload Notice & Guest Folio",
+    "🔍 2. Stay & Billing Verification",
+    "✍️ 3. Dispute Response Letter",
+    "📑 4. Generate Bank Evidence Packet",
+    "🔒 5. Staff Activity & History",
 ])
 
 
 # -----------------------------------------------------------------------------
-# TAB 1: DOCUMENT INGESTION & VISION
+# TAB 1: UPLOAD NOTICE & GUEST FOLIO
 # -----------------------------------------------------------------------------
 with tab_ingest:
-    st.subheader("Zero-Integration Document Ingestion")
+    st.subheader("Front Desk & Back Office Document Intake")
     st.markdown(
-        "Upload bank dispute notices and guest folios without direct PMS / payment gateway API integration. "
-        "Supports PDF notices, itemized PDF/CSV folios, and scanned registration records via **Meta Llama Vision**."
+        "Upload the bank's dispute notice and the guest's folio ledger (PDF or CSV export from Oracle OPERA, Cloudbeds, Mews, etc.). "
+        "No direct PMS connection needed — FolioShield reads your existing hotel exports directly."
     )
 
     c_up1, c_up2 = st.columns(2)
@@ -359,8 +359,8 @@ with tab_ingest:
             st.json({k: v for k, v in folio_data.items() if k not in ("line_items", "raw_text")})
 
     # --- Human review of extracted fields -------------------------------------------------
-    with st.expander("✏️ Review & correct extracted fields", expanded=False):
-        st.caption("Extraction is heuristic. Verify every value against the source documents; corrections are audit-logged.")
+    with st.expander("✏️ Review & Correct Stay Details (Guest Name, Dates, Room #)", expanded=False):
+        st.caption("Verify extracted stay information against your PMS. Any staff corrections are automatically recorded in the audit log.")
         with st.form("field_review"):
             fc1, fc2 = st.columns(2)
             with fc1:
@@ -409,8 +409,8 @@ with tab_ingest:
                         st.info("No changes to save.")
 
     st.markdown("---")
-    st.markdown("#### 👁️ Multimodal Evidence Ingestion (Meta Llama Vision)")
-    st.caption("Upload scanned registration card, physical signature receipt, or government ID copy.")
+    st.markdown("#### 👁️ Scanned Reg Card & Signature Check (Vision AI)")
+    st.caption("Upload a photo or scan of the signed registration card, front desk ID verification, or restaurant dining chit.")
 
     img_file = st.file_uploader("Upload Scanned Document / Receipt Image (Optional):",
                                 type=["png", "jpg", "jpeg"], key="vision_uploader")
@@ -448,24 +448,27 @@ with tab_ingest:
 
 
 # -----------------------------------------------------------------------------
-# TAB 2: RECONCILIATION AUDIT
+# TAB 2: STAY & BILLING VERIFICATION
 # -----------------------------------------------------------------------------
 with tab_audit:
-    st.subheader("Transaction Matching & Card Network Audit")
+    st.subheader("Stay & Billing Verification")
+    st.markdown(
+        "Cross-checks the bank's dispute notice against your hotel folio records to verify guest stay dates, card numbers, and billed charges."
+    )
 
     rule_info = reconciliation.get("rule_details") or {}
     net_col1, net_col2 = st.columns([1, 2])
     with net_col1:
         st.markdown(f"### **{network_code}**")
-        st.markdown(f"<span class='badge'>{rule_info.get('category', 'Unknown category')}</span>", unsafe_allow_html=True)
-        st.write(f"**Name:** {rule_info.get('name', 'Reason code not in knowledge base')}")
-        st.write(f"**Description:** {rule_info.get('description', 'Verify reason code requirements with your processor.')}")
+        st.markdown(f"<span class='badge'>{rule_info.get('category', 'Dispute')}</span>", unsafe_allow_html=True)
+        st.write(f"**Dispute Reason:** {rule_info.get('name', 'Reason code not in knowledge base')}")
+        st.write(f"**Cardholder Claim:** {rule_info.get('description', 'Verify reason code requirements with your processor.')}")
     with net_col2:
-        st.info(f"**Card Scheme Win Strategy:**\n{rule_info.get('win_strategy', 'Provide proof of authorization and service delivery.')}")
-    st.caption("Reason-code guidance is a simplified reference — validate against current card-network rules.")
+        st.info(f"**🏨 Hotel Defense Playbook (How to Win):**\n{rule_info.get('win_strategy', 'Provide proof of authorization and service delivery.')}")
+    st.caption("Reason-code guidance is a simplified hospitality reference — validate against current card-network rules.")
 
     st.markdown("---")
-    st.markdown("#### 1. Cross-Document Reconciliation Highlights")
+    st.markdown("#### 1. Stay & Billing Match Highlights")
     for highlight in reconciliation["audit_highlights"]:
         st.success(f"✓ **{highlight}**")
     for disc in reconciliation["discrepancies"]:
@@ -473,7 +476,7 @@ with tab_audit:
         render[0](f"{render[1]} **{disc['type']}:** {disc['message']}")
 
     st.markdown("---")
-    st.markdown("#### 2. Itemized Folio Ledger Breakdown")
+    st.markdown("#### 2. Room Charges & Incidentals Breakdown")
     items = folio_data.get("line_items") or []
     if items:
         st.dataframe(pd.DataFrame(items), width="stretch", hide_index=True)
@@ -481,51 +484,50 @@ with tab_audit:
         st.write(f"No explicit line items extracted. Folio total charges: ${float(folio_data.get('total_charges') or 0):,.2f}")
 
     st.markdown("---")
-    st.markdown("#### 3. Compelling Evidence Checklist")
-    st.caption("Confirm only documents you actually have on file. Claims in the rebuttal and packet follow these selections.")
+    st.markdown("#### 3. Front Desk Proof Checklist (What's on File)")
+    st.caption("Confirm only documents you actually have on file at the hotel. Claims in the response letter follow these selections.")
     doc_keys = list(SUPPORTING_DOC_TYPES)
     chk_c1, chk_c2 = st.columns(2)
     for i, key in enumerate(doc_keys):
         with (chk_c1 if i < (len(doc_keys) + 1) // 2 else chk_c2):
             st.checkbox(SUPPORTING_DOC_TYPES[key], key=f"doc_{key}")
 
-    st.markdown("##### Requirement coverage")
+    st.markdown("##### Evidence coverage status")
     st.dataframe(
         pd.DataFrame(reconciliation["evidence_checklist"])[["item", "status"]].rename(
             columns={"item": "Required evidence", "status": "Status"}),
         width="stretch", hide_index=True,
     )
 
-    st.markdown("##### Cancellation policy text (optional)")
-    st.text_area("Exact policy wording shown to the guest at booking (printed on page 3 of the packet):",
+    st.markdown("##### Cancellation & booking terms on file (optional)")
+    st.text_area("Exact cancellation wording shown to the guest during reservation (printed on page 3 of the packet):",
                  key="policy_text", height=100)
 
 
 # -----------------------------------------------------------------------------
-# TAB 3: REBUTTAL STUDIO (HUMAN-IN-THE-LOOP)
+# TAB 3: DISPUTE RESPONSE LETTER
 # -----------------------------------------------------------------------------
 with tab_rebuttal:
-    st.subheader("Card-Network-Aware Rebuttal Studio")
+    st.subheader("Dispute Response Letter Studio")
     st.markdown(
-        "Draft an evidence-backed rebuttal letter. Drafts only assert evidence confirmed in the checklist, "
-        "and **must be approved by a named reviewer** before the packet can be compiled."
+        "Generate and review an evidence-backed dispute rebuttal letter for the bank. "
+        "Generated drafts only assert proof confirmed in the checklist above, and **must be approved by a manager or designated staff** before compiling the final packet."
     )
 
     col_reb_ctrl, col_reb_gen = st.columns([3, 1])
     with col_reb_ctrl:
         st.text_area(
-            "Optional Staff Context / Additional Notes for AI:",
+            "Front Desk Notes / Special Guest Context (Optional):",
             key="custom_notes",
-            placeholder="e.g. Guest had dinner at Ocean Grill with a party of 4 at 8:30pm; concierge booked car service.",
-            help="Included in the drafting prompt as reviewer notes (sanitized, max 2,000 characters).",
+            placeholder="e.g. Guest checked in with agent Sarah at 3:15pm, ordered room service on night 2, and concierge booked airport transfer.",
+            help="Included in the drafting prompt as front desk notes (sanitized, max 2,000 characters).",
         )
     with col_reb_gen:
         st.markdown("<br/>", unsafe_allow_html=True)
-        if st.button("✨ Draft Rebuttal", type="primary", width="stretch"):
-            with st.spinner("Drafting rebuttal..."):
+        if st.button("✨ Draft Response Letter", type="primary", width="stretch"):
+            with st.spinner("Drafting response letter..."):
                 draft = llama_engine.draft_rebuttal(notice_data, folio_data, reconciliation,
                                                     custom_instructions=st.session_state.custom_notes)
-            # Safe: the editor widget below has not been instantiated yet in this run.
             st.session_state.rebuttal_editor = draft
             st.session_state.draft_engine = llama_engine.last_engine_used
             st.session_state.approval = None
@@ -535,9 +537,9 @@ with tab_rebuttal:
     if st.session_state.draft_engine:
         st.caption(f"Last draft generated by: `{st.session_state.draft_engine}`")
 
-    st.markdown("#### ✍️ Human-in-the-Loop Review & Editor")
-    st.text_area("Review and refine the defense statement before compiling the packet:", key="rebuttal_editor", height=420,
-                 placeholder="Click “Draft Rebuttal” to generate a starting draft, or write your own.")
+    st.markdown("#### ✍️ Review Letter & Manager Sign-Off")
+    st.text_area("Review and refine the defense letter before signing off and compiling the packet:", key="rebuttal_editor", height=420,
+                 placeholder="Click “Draft Response Letter” to generate a starting draft, or write your own.")
     draft_text: str = st.session_state.rebuttal_editor or ""
     unresolved = draft_text.count("[MISSING")
 
@@ -547,7 +549,7 @@ with tab_rebuttal:
     col_app1, col_app2 = st.columns([1, 3])
     with col_app1:
         approve_disabled = not draft_text.strip() or not (st.session_state.get("reviewer_name") or "").strip()
-        if st.button("✅ Approve Rebuttal", disabled=approve_disabled):
+        if st.button("✅ Manager Sign-Off & Approve", disabled=approve_disabled):
             st.session_state.approval = {
                 "by": actor(),
                 "at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
@@ -561,19 +563,21 @@ with tab_rebuttal:
         if approval_current:
             st.success(f"Approved by **{approval['by']}** at {approval['at']}. Ready for packet compilation.")
         elif approval:
-            st.warning("The draft or case data changed after approval. Review and approve again.")
+            st.warning("The draft or stay data changed after approval. Review and approve again.")
         elif approve_disabled:
-            st.info("Enter your reviewer name in the sidebar and provide a draft to enable approval.")
+            st.info("Enter your staff reviewer name in the sidebar and provide a draft to enable manager sign-off.")
         if unresolved:
             st.warning(f"Draft contains {unresolved} `[MISSING ...]` marker(s). Resolve or remove them before submission.")
 
 
 # -----------------------------------------------------------------------------
-# TAB 4: THREE-PAGE EVIDENCE PACKET (REPORTLAB)
+# TAB 4: GENERATE BANK EVIDENCE PACKET
 # -----------------------------------------------------------------------------
 with tab_pdf:
-    st.subheader("Downloadable Three-Page PDF Evidence Packet")
-    st.markdown("Generate a standardized dispute evidence packet for submission through your payment processor.")
+    st.subheader("Generate & Download 3-Page Bank Dispute Packet")
+    st.markdown(
+        "Generate a standardized, professional 3-page dispute packet formatted for submission to your acquiring bank or payment processor."
+    )
 
     fingerprint = current_fingerprint()
     approval = st.session_state.approval
@@ -581,11 +585,11 @@ with tab_pdf:
     pdf_current = st.session_state.generated_pdf is not None and st.session_state.pdf_fingerprint == fingerprint
 
     if not is_approved:
-        st.info("🔒 Approve the rebuttal in the Rebuttal Studio (tab 3) to unlock packet compilation.")
+        st.info("🔒 Approve the defense letter in Tab 3 (Manager Sign-Off) to unlock packet compilation.")
 
     col_btn_gen, col_btn_dl = st.columns(2)
     with col_btn_gen:
-        if st.button("🔨 Compile 3-Page Evidence Packet", type="primary", width="stretch", disabled=not is_approved):
+        if st.button("🔨 Compile 3-Page Bank Evidence Packet", type="primary", width="stretch", disabled=not is_approved):
             with st.spinner("Generating 3-page PDF evidence packet..."):
                 pdf_bytes = EvidencePacketGenerator.generate_packet(
                     notice_data, folio_data, reconciliation, draft_text,
@@ -600,13 +604,13 @@ with tab_pdf:
             log("pdf_packet_generated", {"size_bytes": len(pdf_bytes), "pages": 3,
                                          "sha256": AuditLogger.calculate_sha256(pdf_bytes),
                                          "message": "Evidence packet compiled"})
-            st.success("✓ 3-Page Evidence Packet generated.")
+            st.success("✓ 3-Page Bank Evidence Packet successfully generated.")
 
     with col_btn_dl:
         if pdf_current:
             safe_case = "".join(ch for ch in str(notice_data.get("case_id") or "Packet") if ch.isalnum() or ch in "-_")
             if st.download_button(
-                label="📥 Download Evidence Packet PDF",
+                label="📥 Download Bank Dispute Packet (PDF)",
                 data=st.session_state.generated_pdf,
                 file_name=f"FolioShield_Dispute_{safe_case}.pdf",
                 mime="application/pdf",
@@ -616,46 +620,46 @@ with tab_pdf:
                 pass
         else:
             if st.session_state.generated_pdf is not None:
-                st.warning("Case data changed since the last compile — recompile to download.")
+                st.warning("Stay data changed since the last compile — recompile to download.")
             st.button("📥 Download Ready After Compilation", disabled=True, width="stretch")
 
     st.markdown("---")
-    st.markdown("#### 📑 Evidence Packet Structure (3 Pages)")
+    st.markdown("#### 📑 What's Inside the 3-Page Packet")
     p1, p2, p3 = st.columns(3)
     with p1:
         st.markdown("""
         **📄 Page 1: Dispute Cover Letter**
-        - Merchant & case metadata
-        - Card network reason code
-        - Full reviewer-approved rebuttal
-        - Approval record & signature lines
+        - Hotel branding & case reference
+        - Bank reason code explanation
+        - Manager-approved defense statement
+        - Staff signature & sign-off block
         """)
     with p2:
         st.markdown("""
-        **📊 Page 2: Itemized Transaction Audit**
-        - Stay details, auth code & card last-4
-        - Itemized folio charges and credits
-        - Computed totals and balance
-        - Reconciliation findings and flags
+        **📊 Page 2: Itemized Folio & Stay Audit**
+        - Check-in/out dates, room #, and auth code
+        - Itemized room rates, taxes & incidentals
+        - Computed ledger balance ($0.00 settled)
+        - Stay verification check summary
         """)
     with p3:
         st.markdown("""
-        **🏛️ Page 3: Evidence Annex**
-        - Reason-code evidence checklist with exhibit letters
-        - Supporting documents on file / missing
-        - Cancellation policy text (if provided)
-        - SHA-256 integrity stamp & certification block
+        **🏛️ Page 3: Evidence Annex & Certification**
+        - Card network compelling evidence checklist
+        - Physical hotel documents on file (Reg card, ID, Keys)
+        - Booking cancellation terms disclosure
+        - SHA-256 tamper-evident integrity certification
         """)
 
 
 # -----------------------------------------------------------------------------
-# TAB 5: AUDIT LOG & COMPLIANCE
+# TAB 5: STAFF ACTIVITY & HISTORY
 # -----------------------------------------------------------------------------
 with tab_logs:
-    st.subheader("Audit Trail & Responsible AI Compliance")
+    st.subheader("Staff Activity Log & Chain of Custody")
     st.markdown(
-        "Hash-chained record of ingestion, corrections, AI drafting, approvals, and packet generation. "
-        "Any modification of a past event breaks the chain."
+        "Complete chronological history of all staff actions, document uploads, reviewer corrections, "
+        "manager approvals, and PDF generations with tamper-evident SHA-256 verification."
     )
 
     logger_obj: AuditLogger = st.session_state.audit_logger
@@ -670,7 +674,7 @@ with tab_logs:
         df_events["event_hash"] = df_events["event_hash"].str[:12]
         st.dataframe(df_events.drop(columns=["prev_hash", "session_id"]), width="stretch", hide_index=True)
         st.download_button(
-            "⬇️ Download audit trail (JSONL)",
+            "⬇️ Download staff activity history (JSONL)",
             data="\n".join(json.dumps(e, default=str) for e in events),
             file_name=f"audit_trail_{logger_obj.session_id}.jsonl",
             mime="application/jsonl",
