@@ -172,12 +172,15 @@ class CaseStore:
         now = _now()
         try:
             existing = self._conn.execute(
-                "SELECT created_at, updated_at FROM cases WHERE case_id = ?", (case_id,)).fetchone()
+                "SELECT tenant_id, created_at, updated_at FROM cases WHERE case_id = ?", (case_id,)).fetchone()
             if existing and expected_updated_at is not None and existing["updated_at"] != expected_updated_at:
                 raise CaseConflictError(
                     f"Case '{case_id}' was modified at {existing['updated_at']} by another session; "
                     "reload it before saving to avoid overwriting their work.")
+            if existing and tenant_id and existing["tenant_id"] and existing["tenant_id"] != tenant_id:
+                raise PermissionError(f"Case '{case_id}' belongs to another tenant.")
             created_at = existing["created_at"] if existing else now
+            eff_tenant_id = existing["tenant_id"] if (existing and existing["tenant_id"] and not tenant_id) else tenant_id
             with self._conn:
                 self._conn.execute(
                     """INSERT INTO cases (case_id, tenant_id, created_at, updated_at, status,
@@ -193,7 +196,7 @@ class CaseStore:
                            audit_session_id=excluded.audit_session_id,
                            audit_head_hash=excluded.audit_head_hash,
                            audit_event_count=excluded.audit_event_count""",
-                    (case_id, tenant_id, created_at, now, status,
+                    (case_id, eff_tenant_id, created_at, now, status,
                      _json(notice), _json(folio), draft_text, policy_text, custom_notes,
                      _json(approval) if approval else None, fingerprint,
                      audit_session_id, audit_head_hash, audit_event_count))
@@ -218,10 +221,15 @@ class CaseStore:
             raise CaseStoreError(f"Could not save case '{case_id}': {exc}") from exc
         return {"case_id": case_id, "created_at": created_at, "updated_at": now}
 
-    def load_case(self, case_id: str) -> Optional[Dict[str, Any]]:
+    def load_case(self, case_id: str, tenant_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Returns the full case record, or None when unknown."""
         try:
-            row = self._conn.execute("SELECT * FROM cases WHERE case_id = ?", (case_id,)).fetchone()
+            if tenant_id:
+                row = self._conn.execute(
+                    "SELECT * FROM cases WHERE case_id = ? AND (tenant_id = ? OR tenant_id IS NULL)",
+                    (case_id, tenant_id)).fetchone()
+            else:
+                row = self._conn.execute("SELECT * FROM cases WHERE case_id = ?", (case_id,)).fetchone()
             if row is None:
                 return None
             items: Dict[str, Dict[str, Any]] = {}
@@ -280,10 +288,15 @@ class CaseStore:
             raise CaseStoreError(f"Could not list cases: {exc}") from exc
         return [dict(r) for r in rows]
 
-    def delete_case(self, case_id: str) -> bool:
+    def delete_case(self, case_id: str, tenant_id: Optional[str] = None) -> bool:
         try:
             with self._conn:
-                cur = self._conn.execute("DELETE FROM cases WHERE case_id = ?", (case_id,))
+                if tenant_id:
+                    cur = self._conn.execute(
+                        "DELETE FROM cases WHERE case_id = ? AND (tenant_id = ? OR tenant_id IS NULL)",
+                        (case_id, tenant_id))
+                else:
+                    cur = self._conn.execute("DELETE FROM cases WHERE case_id = ?", (case_id,))
             return cur.rowcount > 0
         except sqlite3.Error as exc:
             raise CaseStoreError(f"Could not delete case '{case_id}': {exc}") from exc

@@ -23,12 +23,12 @@ from .config import config, Settings
 class FolioShield:
     """
     High-level Python SDK client for FolioShield.
-    
+
     Usage:
         from core.client import FolioShield
-        
+
         fs = FolioShield()
-        
+
         # Ingest directly from PMS dictionary or objects:
         result = fs.process_dispute(
             notice_pdf_bytes=notice_bytes,
@@ -54,6 +54,12 @@ class FolioShield:
             api_key=api_key or self.settings.get_api_key_for_provider(provider or self.settings.llama_provider)
         )
         self.audit_logger = AuditLogger(log_dir=self.settings.log_dir)
+        from .application.dispute_service import DisputeService
+        self.service = DisputeService(
+            settings=self.settings,
+            audit_logger=self.audit_logger,
+            llama_engine=self.llama_engine,
+        )
 
     def extract_notice_from_pdf(self, pdf_bytes: bytes) -> NoticeData:
         """Extracts structured notice data from raw PDF bytes."""

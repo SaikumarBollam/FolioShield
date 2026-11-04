@@ -5,7 +5,6 @@ with seamless switching between 'production', 'testing', and 'development' modes
 """
 
 import os
-import logging
 from dataclasses import dataclass
 from typing import Optional, Literal
 from dotenv import load_dotenv
@@ -66,6 +65,9 @@ class Settings:
     webhook_resume_seconds: int
     webhook_secret_key: Optional[str]
     audit_hmac_key: Optional[str]
+    database_url: Optional[str] = None
+    s3_endpoint_url: Optional[str] = None
+    s3_bucket_name: Optional[str] = None
 
     @property
     def is_production(self) -> bool:
@@ -191,6 +193,9 @@ def get_settings(env_override: Optional[str] = None) -> Settings:
         webhook_resume_seconds=max(0, _int_env("FOLIOSHIELD_WEBHOOK_RESUME_SECONDS", 0)),
         webhook_secret_key=os.getenv("FOLIOSHIELD_WEBHOOK_SECRET_KEY") or None,
         audit_hmac_key=os.getenv("AUDIT_HMAC_KEY") or None,
+        database_url=os.getenv("DATABASE_URL") or None,
+        s3_endpoint_url=os.getenv("S3_ENDPOINT_URL") or None,
+        s3_bucket_name=os.getenv("S3_BUCKET_NAME") or None,
     )
 
 

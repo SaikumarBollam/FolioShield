@@ -20,7 +20,6 @@ and returns (status, detail) where status is:
 Validators never invent facts: unknown detail fields yield "weak", not failure.
 """
 
-import re
 from datetime import date, datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -155,7 +154,7 @@ def v_stay_window_overlap(ctx: Dict[str, Any]) -> Tuple[str, str]:
         lo = stay_in - timedelta(days=1)
         hi = stay_out + timedelta(days=1, hours=23, minutes=59)
         probe = first or last
-        if lo <= probe <= hi:
+        if probe and lo <= probe <= hi:
             return "satisfied", f"Audit entries fall inside the stay window ({folio.get('check_in')} → {folio.get('check_out')}){f', {entries} entries' if entries else ''}."
         return "adverse", "Audit-log entries fall OUTSIDE the stay window — wrong room/dates export, or the log does not prove this stay."
     if entries:
@@ -249,7 +248,8 @@ def v_per_item_slip_match(ctx: Dict[str, Any]) -> Tuple[str, str]:
     if details.get("slip_reference") or details.get("amount") is not None:
         slips.append({"reference": details.get("slip_reference"), "amount": details.get("amount")})
 
-    covered, uncovered = [], []
+    covered: List[Dict[str, Any]] = []
+    uncovered: List[Dict[str, Any]] = []
     for line in disputed:
         amt = _money(line.get("amount"))
         ref = str(line.get("reference") or "").strip().lower()

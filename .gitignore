@@ -40,9 +40,21 @@ logs/*.jsonl
 # Runtime case data (submissions, exhibits, custody records)
 data/submissions/
 data/exhibits/
-data/cases.db
-data/cases.db-shm
-data/cases.db-wal
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.db-journal
+*.db
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.db-journal
+*.db-shm
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.db-journal
+*.db-wal
 
 # Local integration runtime state (registries, demo credentials, agent queues)
 data/integrations/

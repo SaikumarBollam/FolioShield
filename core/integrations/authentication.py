@@ -114,6 +114,13 @@ class AuthenticatedPrincipal:
     roles: List[str] = field(default_factory=list)
     property_ids: List[str] = field(default_factory=list)
 
+    def has_scope(self, scope: str) -> bool:
+        return scope in self.scopes or "*" in self.scopes
+
+    def require_scope(self, scope: str) -> None:
+        if not self.has_scope(scope):
+            raise PermissionError(f"Missing required scope: {scope}")
+
     def to_context(self, request_id: Optional[str] = None) -> Any:
         import uuid
 

@@ -83,7 +83,7 @@ class TestEvidenceActions(unittest.TestCase):
         actions.collect_evidence_file(self.state, "signed_registration_card", "Card", **self.kwargs)
         self.state["evfile_signed_registration_card"] = upload
         actions.collect_evidence_file(self.state, "signed_registration_card", "Card", **self.kwargs)
-        self.assertEqual(len([l for l in self.logs if l[0] == "evidence_file_collected"]), 1)
+        self.assertEqual(len([entry for entry in self.logs if entry[0] == "evidence_file_collected"]), 1)
 
     def test_collect_invalid_file_reports_error(self):
         self.state["evfile_signed_registration_card"] = _FakeUpload("evil.exe", b"MZ\x90\x00")

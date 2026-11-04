@@ -26,7 +26,6 @@ from core.audit_logger import AuditLogger
 from core.client import FolioShield
 from core.fingerprint import case_fingerprint, changed_components
 from core.llm_engine import LlamaEngine
-from core.pdf_generator import EvidencePacketGenerator
 from core.reconciler import Reconciler
 from data.sample_scenarios import SCENARIOS
 from datetime import date
@@ -108,7 +107,8 @@ class TestPhase5Custody(unittest.TestCase):
         lg2 = fresh_logger()
         path2 = os.path.join(lg2.log_dir, f"audit_trail_{lg2.session_id}.jsonl")
         head = lg2.chain_head
-        lines = open(path2, encoding="utf-8").read().splitlines()
+        with open(path2, encoding="utf-8") as _f2:
+            lines = _f2.read().splitlines()
         with open(path2, "w", encoding="utf-8") as f:
             f.write("\n".join(lines[:2]) + "\n")  # truncated file
         ok, _, _ = AuditLogger.load_and_verify(path2, expected_head=head)

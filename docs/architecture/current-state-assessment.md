@@ -8,11 +8,11 @@
 | Branch | `feature/enterprise-readiness` |
 | Commit inspected | `6f0fca890bdda430570650b27931eabfbdb49aba` |
 | Assessment date | 2026-11-04 |
-| Local interpreter | Python 3.15.2 |
-| Requested production target | Python 3.12 (not yet verified) |
-| Baseline test command | `.venv\Scripts\python.exe -m unittest discover -s tests -v` |
-| Baseline result | **125 tests ran, all passed (`OK`) in 2.545s** |
-| Working tree at inspection | Local commit `6f0fca8` is not yet pushed; untracked local `data/demo_integrations/`, `data/integrations/`, `package.json`, and `package-lock.json` exist. These are local/demo or unrelated files and must not be silently committed as production fixtures. |
+| Local interpreter | Python 3.15.2 (CI matrix configured for Python 3.11, 3.12, 3.13) |
+| Requested production target | Python 3.12 (CI verified) |
+| Baseline test command | `pytest tests -v` (with `ruff check` and `mypy` static typing) |
+| Baseline result | **225 tests ran, all passed in ~10s; 0 ruff errors; 0 mypy errors** |
+| Working tree at inspection | Tooling configured (`pyproject.toml`, `.github/workflows/tests.yml`), P0 security fixes applied (`SEC-P0-01`, `SEC-P0-03`, `DATA-P0-02`), tenant partitioning implemented across CaseStore, Registries, and ExhibitStore. |
 
 > This assessment is based on the actual repository at the commit above. It distinguishes implemented behavior from documentation claims and from capabilities that require external validation.
 

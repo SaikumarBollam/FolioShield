@@ -160,7 +160,7 @@ def generate_business_records_affidavit(notice: Dict[str, Any], folio: Dict[str,
         Paragraph("BUSINESS RECORDS AFFIDAVIT", s["title"]),
         Paragraph("(Custodian of Records — Template)", s["small"]),
         Spacer(1, 12),
-        Paragraph(f"State/County of ______________________________ &nbsp;&nbsp; Venue/Court: ______________________________", s["body"]),
+        Paragraph("State/County of ______________________________ &nbsp;&nbsp; Venue/Court: ______________________________", s["body"]),
         Spacer(1, 10),
         Paragraph(f"I, {esc(affiant.get('name') or '[AFFIANT NAME]')}, being duly sworn, declare and state:", s["body"]),
         Spacer(1, 6),
@@ -403,16 +403,27 @@ class LegalRegistry:
         self.root = root
         os.makedirs(root, exist_ok=True)
 
-    def _path(self, case_id: str) -> str:
-        return os.path.join(self.root, f"{_safe(case_id or 'unknown')}.jsonl")
+    def _path(self, case_id: str, tenant_id: Optional[str] = None) -> str:
+        safe_case = _safe(case_id or 'unknown')
+        if tenant_id:
+            tdir = os.path.join(self.root, _safe(tenant_id))
+            os.makedirs(tdir, exist_ok=True)
+            return os.path.join(tdir, f"{safe_case}.jsonl")
+        return os.path.join(self.root, f"{safe_case}.jsonl")
 
-    def _append(self, case_id: str, kind: str, record: Dict[str, Any]) -> None:
+    def _append(self, case_id: str, kind: str, record: Dict[str, Any], tenant_id: Optional[str] = None) -> None:
         entry = {"kind": kind, "recorded_at": datetime.now(timezone.utc).isoformat(), "record": record}
-        append_jsonl(self._path(case_id), entry)
+        tid = tenant_id or record.get("tenant_id")
+        append_jsonl(self._path(case_id, tid), entry)
 
-    def load(self, case_id: str) -> Dict[str, Any]:
+    def load(self, case_id: str, tenant_id: Optional[str] = None) -> Dict[str, Any]:
         out: Dict[str, Any] = {"witnesses": [], "filings": [], "corrupt_lines": []}
-        entries, corrupt = read_jsonl(self._path(case_id))
+        path = self._path(case_id, tenant_id)
+        if not os.path.exists(path) and tenant_id:
+            fallback = self._path(case_id, None)
+            if os.path.exists(fallback):
+                path = fallback
+        entries, corrupt = read_jsonl(path)
         for entry in entries:
             if entry.get("kind") == "witness":
                 out["witnesses"].append(entry.get("record") or {})

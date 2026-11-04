@@ -155,19 +155,24 @@ flowchart TD
 
 | Layer | Technology |
 |---|---|
-| Language | Python (production target: Python 3.12; verify before deployment) |
+| Language | Python (production target: Python 3.12, CI matrix verified) |
 | Web UI | Streamlit |
-| REST API | Python standard-library HTTP server today; production ASGI migration is planned/evaluated in the architecture roadmap |
+| Application Layer | `DisputeService` (`core/application/dispute_service.py`) |
+| Web UI | Streamlit |
+| REST API | Production FastAPI ASGI server (`core/api_asgi.py`) on `uvicorn`; reference `ThreadingHTTPServer` (`core/api.py`) |
 | SDK | Python (`requests` for remote HTTP client) |
 | Document extraction | `pdfplumber`, `pypdf`, `pandas`, Pillow |
 | PDF generation | ReportLab |
 | AI | Meta Llama-compatible APIs via Groq, Together AI, or OpenRouter; deterministic offline fallback |
 | Configuration | `python-dotenv`, environment variables |
-| Current persistence | JSON/JSONL registries, JSONL audit logs, content-addressed local evidence files, SQLite for the local agent queue |
-| Planned persistence | PostgreSQL for structured data; local/S3-compatible object storage for documents |
-| Testing | Python `unittest` |
+| Persistence & Repositories | PostgreSQL & SQLite via SQLAlchemy 2.0 (`core/infrastructure/database/`), Alembic migrations (`alembic/`) |
+| Evidence Storage | Pluggable `StorageBackend`: Local filesystem with atomic fsync, S3/MinIO/R2, and Memory (`core/infrastructure/storage/`) |
+| Audit & Custody | Tamper-evident hash-chained audit trails (`core/audit_logger.py`), canonical fingerprints (`core/fingerprint.py`) |
+| Testing & Quality | Pytest (243+ tests), Ruff linter, Mypy strict type checking, Pytest-Cov |
+| Deployment | Docker, Docker Compose (PostgreSQL 16, MinIO, FastAPI, Streamlit), GitHub Actions CI |
 
-Dependencies are listed in [`requirements.txt`](requirements.txt). PostgreSQL/SQLAlchemy/Alembic and production object-storage dependencies are **not yet introduced**; they are part of the enterprise upgrade roadmap.
+
+Dependencies are managed in [`pyproject.toml`](pyproject.toml) and [`requirements.txt`](requirements.txt), with optional extras for `dev` (Ruff/Mypy/Pytest), `server` (FastAPI/uvicorn), and `db` (SQLAlchemy/Alembic).
 
 ---
 

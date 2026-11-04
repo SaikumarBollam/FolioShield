@@ -47,6 +47,7 @@ class FolioLineItem:
 @dataclass
 class NoticeData:
     case_id: Optional[str] = None
+    tenant_id: Optional[str] = None
     card_network: Optional[str] = "Visa"
     reason_code: Optional[str] = None
     reason_description: Optional[str] = None
@@ -261,6 +262,7 @@ SUBMISSION_STATUSES = ("prepared", "submitted", "acknowledged", "under_review",
 class SubmissionRecord:
     """One representment submission to an acquirer/processor portal."""
     case_id: Optional[str] = None
+    tenant_id: Optional[str] = None
     arn: Optional[str] = None
     portal_id: str = "generic"
     portal_name: Optional[str] = None
@@ -287,6 +289,7 @@ class SubmissionRecord:
 class OutcomeRecord:
     """Issuer decision (and escalation) for a submitted case."""
     case_id: Optional[str] = None
+    tenant_id: Optional[str] = None
     decision: str = "pending"               # pending / won / lost / partially_won
     decided_at: Optional[str] = None
     amount_recovered: float = 0.0
@@ -329,6 +332,7 @@ class WitnessRecord:
 class LegalFilingRecord:
     """Demand-letter / court / police filing tracking for the legal track."""
     case_id: Optional[str] = None
+    tenant_id: Optional[str] = None
     track: str = "civil"                    # civil / criminal
     kind: str = "demand_letter"             # demand_letter / small_claims_filing / police_report / ic3_report
     status: str = "draft"                   # draft / sent / filed / received / closed

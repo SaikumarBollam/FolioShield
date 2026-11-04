@@ -97,6 +97,25 @@ class TestEnterpriseIntegrations(unittest.TestCase):
         self.assertTrue(session.calls[0]["headers"]["Authorization"].startswith("Bearer "))
         self.assertIn("X-Request-Id", session.calls[0]["headers"])
 
+    def test_upload_document_retains_bytes_in_exhibit_store(self):
+        ctx = TenantContext(tenant_id="hotel-a", actor_id="uploader", scopes=["cases:write", "documents:write"])
+        service = IntegrationService(registry=self.registry)
+        service.create_case(ctx, IntegrationCaseRef(tenant_id="hotel-a", case_id="CASE-EXHIBIT-1"))
+        fake_pdf = b"%PDF-1.4 test folio evidence content\n%%EOF\n"
+        upload_res = service.upload_document(
+            ctx,
+            case_id="CASE-EXHIBIT-1",
+            document_type="supporting_evidence",
+            filename="registration_card.pdf",
+            media_type="application/pdf",
+            data=fake_pdf,
+            evidence_doc_type="signed_registration_card",
+        )
+        stored_ref = upload_res["document"]["stored_ref"]
+        self.assertIsNotNone(stored_ref)
+        retained = service.exhibit_store.get(stored_ref, filename="registration_card.pdf")
+        self.assertEqual(retained, fake_pdf)
+
 
 if __name__ == "__main__":
     unittest.main()

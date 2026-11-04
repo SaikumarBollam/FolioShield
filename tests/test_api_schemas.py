@@ -62,7 +62,7 @@ class TestOpenApiDrift(unittest.TestCase):
 class TestDependencyParity(unittest.TestCase):
     def test_requirements_matches_pyproject(self):
         requirements = {
-            re.split(r"[<>=!~ \[]", line.strip(), 1)[0].lower()
+            re.split(r"[<>=!~ \[]", line.strip(), maxsplit=1)[0].lower()
             for line in (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.startswith("#")
         }
@@ -78,7 +78,7 @@ class TestDependencyParity(unittest.TestCase):
                     break
                 match = re.search(r'"([^"]+)"', line)
                 if match:
-                    declared.add(re.split(r"[<>=!~ \[]", match.group(1), 1)[0].lower())
+                    declared.add(re.split(r"[<>=!~ \[]", match.group(1), maxsplit=1)[0].lower())
         self.assertEqual(requirements, declared)
 
 

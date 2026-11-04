@@ -14,11 +14,10 @@ Phase 6 (Bank Submission) Tests for FolioShield.
 
 import io
 import json
-import os
 import tempfile
 import unittest
 import zipfile
-from datetime import date, timedelta
+from datetime import date
 
 from core.client import FolioShield
 from core.exhibit_store import ExhibitStore

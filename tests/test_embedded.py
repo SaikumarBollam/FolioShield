@@ -5,7 +5,6 @@ Signed context is validated server-side. Tampered, expired, wrong-audience,
 and non-allowlisted-origin contexts must fail closed.
 """
 
-import time
 import unittest
 
 from embedded.configuration import EmbeddedConfiguration

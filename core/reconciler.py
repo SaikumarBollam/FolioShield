@@ -307,7 +307,7 @@ class Reconciler:
         nights = len(room_items) if room_items else None
         expected_room = round(nights * rate, 2) if (nights and rate > 0) else None
         rate_check_ok: Optional[bool] = None
-        if expected_room is not None:
+        if expected_room is not None and nights is not None:
             rate_check_ok = abs(expected_room - room_total) <= max(ROUNDING_TOLERANCE, 0.02 * nights)
 
         # Tax consistency: implied tax rate per tax line vs the stay's modal rate
@@ -1021,8 +1021,8 @@ class Reconciler:
             "adverse": adverse_evidence,
             "submittable": not missing_dispositive,
             "mapping_curated": mapping_curated,
-            "weakest_link": (missing_dispositive or adverse_evidence or
-                             [e["item"] for e in evidence_status if e["validation"] == "weak"] or [None])[0],
+            "weakest_link": next(iter(missing_dispositive or adverse_evidence or [e["item"] for e in evidence_status if e["validation"] == "weak"]), None),
+
         }
 
         collection_gaps = cls._collection_gaps(notice, folio)

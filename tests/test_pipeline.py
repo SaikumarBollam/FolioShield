@@ -10,10 +10,10 @@ import unittest
 from datetime import date, timedelta
 import pypdf
 
-from core.security import mask_card_number, mask_pii, sanitize_untrusted_text, validate_upload
+from core.security import mask_card_number, sanitize_untrusted_text, validate_upload
 from core.rules import lookup_reason_code, get_evidence_checklist_for_dispute
-from core.extractor import DocumentExtractor, ExtractionError
-from core.reconciler import Reconciler, parse_date
+from core.extractor import DocumentExtractor
+from core.reconciler import Reconciler
 from core.llm_engine import LlamaEngine
 from core.audit_logger import AuditLogger
 from core.pdf_generator import EvidencePacketGenerator
@@ -45,7 +45,7 @@ class TestFolioShieldPipeline(unittest.TestCase):
             validate_upload(b"", "empty.pdf")
         with self.assertRaises(ValueError):
             validate_upload(b"NOT_A_PDF_CONTENT", "fake.pdf")
-        
+
         # Valid PDF header
         validate_upload(b"%PDF-1.4 valid mock bytes", "real.pdf")
 

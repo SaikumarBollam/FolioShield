@@ -12,7 +12,6 @@ Responsible-AI rules enforced here:
 import base64
 import json
 import logging
-import os
 import re
 from dataclasses import dataclass
 from datetime import date
@@ -559,7 +558,7 @@ Include the Case ID and ARN in the letter. Do not invent any fact, timestamp, or
                 f"{hotel} contests the chargeback of ${disp_amt:,.2f} {currency} under {network} Reason Code {code} ({code_name}). "
                 f"The cardholder's claim — \"{claim}\" — is answered by the booking and cancellation record: the reservation was cancelled"
                 + (f" at {folio.get('cancellation_timestamp')}" if folio.get("cancellation_timestamp") else "")
-                + f", and the charge follows the policy accepted at booking" + cite("policy") + "."
+                + ", and the charge follows the policy accepted at booking" + cite("policy") + "."
             )
             closing_ask = f"reverse this chargeback and re-credit ${disp_amt:,.2f} {currency} to {hotel} (Case {case_id}, ARN {arn})"
         elif recon.get("is_partial"):

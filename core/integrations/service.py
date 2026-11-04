@@ -12,6 +12,7 @@ import base64
 from typing import Any, Dict, Optional
 
 from ..client import FolioShield
+from ..exhibit_store import ExhibitStore
 from ..extractor import DocumentExtractor
 from ..models import EvidenceItem
 from ..security import sanitize_filename, validate_upload
@@ -24,10 +25,12 @@ class IntegrationService:
     """Tenant-aware orchestration around the existing FolioShield engine."""
 
     def __init__(self, registry: IntegrationRegistry, engine: Optional[FolioShield] = None,
-                 webhooks: Optional[WebhookManager] = None):
+                 webhooks: Optional[WebhookManager] = None,
+                 exhibit_store: Optional[ExhibitStore] = None):
         self.registry = registry
         self.engine = engine or FolioShield()
         self.webhooks = webhooks or WebhookManager(registry)
+        self.exhibit_store = exhibit_store or ExhibitStore(root=self.engine.settings.exhibit_store_dir)
 
     # ------------------------------------------------------------------ events
 
@@ -85,9 +88,11 @@ class IntegrationService:
         if not record:
             raise KeyError("Case not found for tenant")
         payload = record["payload"]
+        stored = self.exhibit_store.put(data, filename)
+        stored_ref = str(stored.get("stored_ref") or stored.get("sha256"))
         submission = DocumentSubmission.for_bytes(
             document_type, filename, media_type, data, source=context.actor_type,
-            evidence_doc_type=evidence_doc_type)
+            evidence_doc_type=evidence_doc_type, stored_ref=stored_ref)
 
         if document_type == "dispute_notice":
             text = DocumentExtractor.extract_text_from_pdf(data)
@@ -104,7 +109,7 @@ class IntegrationService:
             docs[doc_type] = EvidenceItem(
                 doc_type=doc_type, present=True, filename=filename,
                 sha256=submission.sha256, verified_by=context.actor_id,
-                size_bytes=submission.size_bytes, mime=media_type, stored_ref=submission.sha256,
+                size_bytes=submission.size_bytes, mime=media_type, stored_ref=stored_ref,
             ).to_dict()
         else:
             raise ValueError(f"Unsupported document_type: {document_type}")

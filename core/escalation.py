@@ -24,7 +24,6 @@ Stage rules differ by network and change over time; deadlines/fees here are
 configurable defaults labelled "verify with your acquirer".
 """
 
-import json
 import os
 import re
 from datetime import date, datetime, timedelta, timezone
@@ -143,7 +142,7 @@ def gap_analysis(round_snapshot: Dict[str, Any]) -> List[Dict[str, Any]]:
                            if v.get("validation") == "adverse" else
                            "Collect and validate this exhibit for the supplemental round"),
             })
-    gaps.sort(key=lambda g: (rank.get(g.get("criticality"), 3), 0 if g["validation"] == "adverse" else 1))
+    gaps.sort(key=lambda g: (rank.get(str(g.get("criticality") or ""), 3), 0 if g["validation"] == "adverse" else 1))
     return gaps
 
 
@@ -172,8 +171,8 @@ def round_diff(prior_snapshot: Dict[str, Any], current_recon: Dict[str, Any]) ->
 
 def next_exhibit_letter(existing_letters: List[str]) -> str:
     """Continues exhibit lettering across rounds (…G → H)."""
-    used = {str(l).strip().upper() for l in existing_letters if l}
-    idx = len([l for l in used if len(l) == 1 and "A" <= l <= "Z"])
+    used = {str(let).strip().upper() for let in existing_letters if let}
+    idx = len([let for let in used if len(let) == 1 and "A" <= let <= "Z"])
     while idx < 26 and chr(65 + idx) in used:
         idx += 1
     return chr(65 + idx) if idx < 26 else f"E{len(used) + 1}"
@@ -236,19 +235,30 @@ class EscalationRegistry:
         self.root = root
         os.makedirs(root, exist_ok=True)
 
-    def _path(self, case_id: str) -> str:
-        return os.path.join(self.root, f"{_safe(case_id or 'unknown')}.jsonl")
+    def _path(self, case_id: str, tenant_id: Optional[str] = None) -> str:
+        safe_case = _safe(case_id or 'unknown')
+        if tenant_id:
+            tdir = os.path.join(self.root, _safe(tenant_id))
+            os.makedirs(tdir, exist_ok=True)
+            return os.path.join(tdir, f"{safe_case}.jsonl")
+        return os.path.join(self.root, f"{safe_case}.jsonl")
 
-    def _append(self, case_id: str, kind: str, record: Dict[str, Any]) -> None:
+    def _append(self, case_id: str, kind: str, record: Dict[str, Any], tenant_id: Optional[str] = None) -> None:
         entry = {"kind": kind, "recorded_at": datetime.now(timezone.utc).isoformat(), "record": record}
-        append_jsonl(self._path(case_id), entry)
+        tid = tenant_id or record.get("tenant_id")
+        append_jsonl(self._path(case_id, tid), entry)
 
-    def load(self, case_id: str) -> Dict[str, Any]:
+    def load(self, case_id: str, tenant_id: Optional[str] = None) -> Dict[str, Any]:
         out: Dict[str, Any] = {"stage_history": [], "rounds": [], "losses": [], "arbitration": [], "corrupt_lines": []}
         kind_map = {"stage": "stage_history", "round_snapshot": "rounds", "loss": "losses", "arbitration": "arbitration"}
-        entries, corrupt = read_jsonl(self._path(case_id))
+        path = self._path(case_id, tenant_id)
+        if not os.path.exists(path) and tenant_id:
+            fallback = self._path(case_id, None)
+            if os.path.exists(fallback):
+                path = fallback
+        entries, corrupt = read_jsonl(path)
         for entry in entries:
-            key = kind_map.get(entry.get("kind"))
+            key = kind_map.get(str(entry.get("kind") or ""))
             if key:
                 out[key].append(entry.get("record") or {})
         out["corrupt_lines"] = corrupt

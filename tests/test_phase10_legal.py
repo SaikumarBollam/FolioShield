@@ -12,7 +12,6 @@ Phase 10 (Court / Legal Track) Tests for FolioShield.
 """
 
 import io
-import json
 import tempfile
 import unittest
 import zipfile
