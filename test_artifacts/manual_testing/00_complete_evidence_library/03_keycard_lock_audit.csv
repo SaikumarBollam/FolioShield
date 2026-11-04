@@ -1,0 +1,7 @@
+timestamp,room,event_type,key_id,source_system
+2026-10-10 15:22,412,first_entry,KEY-884120-A,Onity HT28
+2026-10-10 19:04,412,entry,KEY-884120-A,Onity HT28
+2026-10-11 08:12,412,entry,KEY-884120-A,Onity HT28
+2026-10-11 22:31,412,entry,KEY-884120-B,Onity HT28
+2026-10-12 09:18,412,entry,KEY-884120-A,Onity HT28
+2026-10-13 10:48,412,last_entry,KEY-884120-A,Onity HT28

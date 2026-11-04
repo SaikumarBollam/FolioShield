@@ -1,0 +1,4 @@
+timestamp,room,network,device_label,event
+2026-10-10 15:31,412,GrandHorizon-Guest,Guest device (synthetic),first_seen
+2026-10-11 20:44,412,GrandHorizon-Guest,Guest device (synthetic),session
+2026-10-13 10:20,412,GrandHorizon-Guest,Guest device (synthetic),last_seen

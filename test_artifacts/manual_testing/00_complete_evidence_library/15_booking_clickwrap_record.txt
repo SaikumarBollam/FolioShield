@@ -1,0 +1,21 @@
+Booking Clickwrap Record
+========================
+Grand Horizon Resort & Suites · 100 Ocean Avenue, Miami Beach, FL 33139
+Commercial hospitality business record — synthetic test fixture.
+
+Guest: Jonathan C. Davis
+Folio: FOL-2026-9812  Room: 412
+Case: V-DISP-89214-X  ARN: 24492156291002918274019
+
+Property: Grand Horizon Resort & Suites
+Confirmation: GH-884120
+Guest: Jonathan C. Davis
+Booking channel: Hotel Website
+Guest IP address: 203.0.113.42 (synthetic test address)
+User agent: Mozilla/5.0 (synthetic test browser)
+Terms version: CANCEL-POL-2026.09
+Terms hash (SHA-256): 9f2c4a7b1d8e4f0a9c3b5d7e2a4f6b8c0d1e3f5a7b9c2d4e6f8a0b1c3d5e7f90
+Acceptance timestamp: 2026-09-28 14:01 UTC
+Action: Guest selected 'Agree and Complete Booking' after rate, tax, and cancellation terms were displayed.
+
+Verify all facts against source systems before submission.

@@ -1,0 +1,20 @@
+3-D Secure Authentication Record
+================================
+Grand Horizon Resort & Suites · 100 Ocean Avenue, Miami Beach, FL 33139
+Commercial hospitality business record — synthetic test fixture.
+
+Guest: Jonathan C. Davis
+Folio: FOL-2026-9812  Room: 412
+Case: V-DISP-89214-X  ARN: 24492156291002918274019
+
+Merchant: Grand Horizon Resort & Suites
+Confirmation: GH-884120
+Channel: Hotel website booking engine
+Card: Visa ************4821
+3-D Secure status: Authenticated
+ECI: 05
+CAVV: Present (issuer authentication value on file with gateway)
+Authenticated at: 2026-09-28 14:01 UTC
+Outcome: Authentication successful; authorization proceeded as AP98231.
+
+Verify all facts against source systems before submission.
