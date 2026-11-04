@@ -23,6 +23,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from .config import config
+from ._jsonl import append_jsonl
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class AuditLogger:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         self.session_id = f"disp_{stamp}_{uuid.uuid4().hex[:8]}"
         self.events: List[Dict[str, Any]] = []
-        key = hmac_key if hmac_key is not None else os.getenv("AUDIT_HMAC_KEY", "")
+        key = hmac_key if hmac_key is not None else (config.audit_hmac_key or "")
         self._hmac_key = key.encode("utf-8") if key else None
 
     # ------------------------------------------------------------------ hashing
@@ -69,13 +70,20 @@ class AuditLogger:
 
     # ------------------------------------------------------------------ logging
 
-    def log_event(self, action: str, details: Dict[str, Any], user: str = "Staff Reviewer") -> Dict[str, Any]:
-        """Records a hash-chained audit event and persists it to disk."""
+    def log_event(self, action: str, details: Dict[str, Any], user: str = "Staff Reviewer",
+                  case_id: Optional[str] = None) -> Dict[str, Any]:
+        """Records a hash-chained audit event and persists it to disk.
+
+        Phase 3: `case_id` is stored as a top-level event field so case
+        trails can be assembled reliably across sessions (the legacy
+        details.case_id copy is still honored on read).
+        """
         event = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "session_id": self.session_id,
             "action": action,
             "actor": user,
+            "case_id": case_id if case_id is not None else details.get("case_id"),
             "details": details,
             "prev_hash": self.events[-1]["event_hash"] if self.events else GENESIS_HASH,
         }
@@ -87,10 +95,13 @@ class AuditLogger:
     def _persist_event(self, event: Dict[str, Any]) -> None:
         file_path = os.path.join(self.log_dir, f"audit_trail_{self.session_id}.jsonl")
         try:
-            with open(file_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(event, default=str) + "\n")
+            append_jsonl(file_path, event)
+            self.persist_failures = 0
         except OSError as e:
             # Non-blocking if disk write fails; in-memory trail is still kept.
+            # The failure count is tracked so diagnostics can surface it
+            # instead of the trail silently diverging from disk (Phase 2).
+            self.persist_failures = getattr(self, "persist_failures", 0) + 1
             logger.warning("Could not persist audit event to %s: %s", file_path, e)
 
     # -------------------------------------------------------------- verification
@@ -140,7 +151,7 @@ class AuditLogger:
         probe = cls.__new__(cls)
         probe.session_id = events[0].get("session_id", "loaded") if events else "loaded"
         probe.events = events
-        key = hmac_key if hmac_key is not None else os.getenv("AUDIT_HMAC_KEY", "")
+        key = hmac_key if hmac_key is not None else (config.audit_hmac_key or "")
         probe._hmac_key = key.encode("utf-8") if key else None
         probe.log_dir = os.path.dirname(file_path)
 
@@ -154,21 +165,37 @@ class AuditLogger:
         return list(self.events)
 
     def get_events_for_case(self, case_id: str) -> List[Dict[str, Any]]:
-        """Events whose details reference the given case ID."""
+        """Events linked to the given case ID.
+
+        Matches the top-level `case_id` field (Phase 3) or the legacy
+        details.case_id. Substring searching was removed: a case ID
+        appearing inside another event's text is not a custody link.
+        """
         out = []
         for evt in self.events:
             details = evt.get("details") or {}
-            if details.get("case_id") == case_id or case_id in json.dumps(details, default=str):
+            if evt.get("case_id") == case_id or details.get("case_id") == case_id:
                 out.append(evt)
         return out
 
-    def build_case_manifest(self, case_id: Optional[str] = None) -> Dict[str, Any]:
+    def build_case_manifest(self, case_id: Optional[str] = None, include_history: bool = False) -> Dict[str, Any]:
         """
         Case custody manifest: everything a bank (or auditor) needs to verify
         this case offline — file hashes, evidence hashes, approval record,
         and the anchored chain head.
+
+        Phase 3: with include_history=True and a case_id, events from prior
+        sessions (indexed from the log directory) are merged in — deduped by
+        event hash — and per-session verification status is reported, so a
+        reopened case's manifest covers its full custody trail.
         """
         events = self.get_events_for_case(case_id) if case_id else list(self.events)
+        history_sessions: List[Dict[str, Any]] = []
+        if include_history and case_id:
+            from .audit_index import events_for_case, merge_case_events, verify_case_history
+
+            events = merge_case_events(events, events_for_case(case_id, self.log_dir))
+            history_sessions = verify_case_history(case_id, self.log_dir).get("sessions", [])
         files: List[Dict[str, Any]] = []
         approval: Optional[Dict[str, Any]] = None
         packet: Optional[Dict[str, Any]] = None
@@ -198,6 +225,7 @@ class AuditLogger:
             "session_id": self.session_id,
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "chain_head": self.chain_head,
+            "history_sessions": history_sessions,
             "files": files,
             "approval": approval,
             "packet": packet,

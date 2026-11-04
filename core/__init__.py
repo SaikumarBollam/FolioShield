@@ -12,12 +12,13 @@ from .audit_logger import AuditLogger
 from .rules import lookup_reason_code, get_evidence_checklist_for_dispute
 from .config import config, get_settings, Settings
 from .models import NoticeData, FolioData, FolioLineItem, DisputePacketResponse, EvidenceItem
-from .client import FolioShield
+from .client import FolioShield, FolioShieldHTTPClient
 from .api import FolioShieldAPIHandler, run_api_server
 
 __all__ = [
     # High-level SDK client for BMS / PMS integrations
     "FolioShield",
+    "FolioShieldHTTPClient",
     "NoticeData",
     "FolioData",
     "FolioLineItem",

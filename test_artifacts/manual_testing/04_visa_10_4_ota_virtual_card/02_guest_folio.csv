@@ -1,6 +1,6 @@
-Date,Description,Charge,Credit,Reference,Category
-2026-10-18,Room Accommodation - Queen,240.0,0.0,RM517,Room
-2026-10-18,Occupancy & Resort Tax (12.5%),30.0,0.0,TAX-OCC,Tax
-2026-10-19,Room Accommodation - Queen,240.0,0.0,RM517,Room
-2026-10-19,Occupancy & Resort Tax (12.5%),30.0,0.0,TAX-OCC,Tax
-2026-10-20,Visa Virtual Card Payment (Auth: VC44190),0.0,540.0,AUTH-VC44190,Payment
+Date,Description,Charge,Credit,Reference,Category,Disputed
+2026-10-18,Room Accommodation - Queen,240.0,0.0,RM517,Room,
+2026-10-18,Occupancy & Resort Tax (12.5%),30.0,0.0,TAX-OCC,Tax,
+2026-10-19,Room Accommodation - Queen,240.0,0.0,RM517,Room,
+2026-10-19,Occupancy & Resort Tax (12.5%),30.0,0.0,TAX-OCC,Tax,
+2026-10-20,Visa Virtual Card Payment (Auth: VC44190),0.0,540.0,AUTH-VC44190,Payment,

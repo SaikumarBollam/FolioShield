@@ -1,0 +1,473 @@
+openapi: 3.1.0
+info:
+  title: FolioShield API
+  version: 1.1.0
+  description: >-
+    Hotel chargeback defense API. Legacy endpoints require the shared
+    API key when FOLIOSHIELD_API_KEY is configured (fail-closed in
+    production). Enterprise integration endpoints require tenant
+    Bearer credentials. Machine processing never creates human
+    approval: packets are drafts until an explicit, fingerprint-bound
+    approval is supplied.
+servers:
+  - url: http://localhost:8000
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/health:
+    get:
+      summary: Liveness probe (minimal public payload).
+      security: []
+      responses:
+        '200': {description: OK}
+  /health:
+    get:
+      summary: Liveness probe (minimal public payload).
+      security: []
+      responses:
+        '200': {description: OK}
+  /api/v1/dispute/approve:
+    post:
+      summary: Legacy dispute endpoint /api/v1/dispute/approve.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+        type: object
+        properties:
+          notice:
+            type: object
+          folio:
+            type: object
+          rebuttal_text:
+            type: string
+            maxLength: 200000
+          approved_by:
+            type: string
+            maxLength: 256
+          supporting_docs:
+            type: object
+          policy_text:
+            type: string
+            maxLength: 100000
+          custom_notes:
+            type: string
+            maxLength: 10000
+        required: [notice, folio, rebuttal_text, approved_by]
+      responses:
+        '200': {description: OK}
+        '400': {description: Validation or request error}
+        '401': {description: Authentication required}
+        '409': {description: Approval stale (packet/generate)}
+        '429': {description: Rate limited}
+  /api/v1/dispute/process:
+    post:
+      summary: Legacy dispute endpoint /api/v1/dispute/process.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+        type: object
+        properties:
+          notice:
+          folio:
+          supporting_docs:
+            type: object
+          custom_notes:
+            type: string
+            maxLength: 10000
+          policy_text:
+            type: string
+            maxLength: 100000
+          reviewer_name:
+            type: string
+            maxLength: 256
+        required: [notice, folio]
+      responses:
+        '200': {description: OK}
+        '400': {description: Validation or request error}
+        '401': {description: Authentication required}
+        '409': {description: Approval stale (packet/generate)}
+        '429': {description: Rate limited}
+  /api/v1/packet/generate:
+    post:
+      summary: Legacy dispute endpoint /api/v1/packet/generate.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+        type: object
+        properties:
+          notice:
+            type: object
+          folio:
+            type: object
+          rebuttal_text:
+            type: string
+            maxLength: 200000
+          supporting_docs:
+            type: object
+          policy_text:
+            type: string
+            maxLength: 100000
+          approval:
+            type: object
+        required: [notice, folio, rebuttal_text]
+      responses:
+        '200': {description: OK}
+        '400': {description: Validation or request error}
+        '401': {description: Authentication required}
+        '409': {description: Approval stale (packet/generate)}
+        '429': {description: Rate limited}
+  /api/v1/rebuttal/draft:
+    post:
+      summary: Legacy dispute endpoint /api/v1/rebuttal/draft.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+        type: object
+        properties:
+          notice:
+            type: object
+          folio:
+            type: object
+          supporting_docs:
+            type: object
+          custom_notes:
+            type: string
+            maxLength: 10000
+        required: [notice, folio]
+      responses:
+        '200': {description: OK}
+        '400': {description: Validation or request error}
+        '401': {description: Authentication required}
+        '409': {description: Approval stale (packet/generate)}
+        '429': {description: Rate limited}
+  /api/v1/reconcile:
+    post:
+      summary: Legacy dispute endpoint /api/v1/reconcile.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+        type: object
+        properties:
+          notice:
+            type: object
+          folio:
+            type: object
+          supporting_docs:
+            type: object
+        required: [notice, folio]
+      responses:
+        '200': {description: OK}
+        '400': {description: Validation or request error}
+        '401': {description: Authentication required}
+        '409': {description: Approval stale (packet/generate)}
+        '429': {description: Rate limited}
+  /api/v1/submission/bundle:
+    post:
+      summary: Legacy dispute endpoint /api/v1/submission/bundle.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+        type: object
+        properties:
+          notice:
+            type: object
+          folio:
+            type: object
+          packet_base64:
+            type: string
+            maxLength: 30000000
+          exhibits:
+            type: object
+          supporting_docs:
+            type: object
+          portal_id:
+            type: string
+            maxLength: 64
+        required: [notice, folio, packet_base64]
+      responses:
+        '200': {description: OK}
+        '400': {description: Validation or request error}
+        '401': {description: Authentication required}
+        '409': {description: Approval stale (packet/generate)}
+        '429': {description: Rate limited}
+  /api/v1/submission/outcome:
+    post:
+      summary: Legacy dispute endpoint /api/v1/submission/outcome.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+        type: object
+        properties:
+          case_id:
+            type: string
+            maxLength: 128
+          decision:
+            type: string
+            maxLength: 64
+          amount_recovered:
+            type: number
+          decided_at:
+            type: string
+            maxLength: 64
+          next_stage:
+            type: string
+            maxLength: 64
+          notes:
+            type: string
+            maxLength: 5000
+        required: [case_id, decision]
+      responses:
+        '200': {description: OK}
+        '400': {description: Validation or request error}
+        '401': {description: Authentication required}
+        '409': {description: Approval stale (packet/generate)}
+        '429': {description: Rate limited}
+  /api/v1/submission/register:
+    post:
+      summary: Legacy dispute endpoint /api/v1/submission/register.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+        type: object
+        properties:
+          case_id:
+            type: string
+            maxLength: 128
+          portal_id:
+            type: string
+            maxLength: 64
+          bundle_sha256:
+            type: string
+            maxLength: 128
+          confirmation_reference:
+            type: string
+            maxLength: 256
+          submitted_by:
+            type: string
+            maxLength: 256
+          submitted_at:
+            type: string
+            maxLength: 64
+          status:
+            type: string
+            maxLength: 64
+          notes:
+            type: string
+            maxLength: 5000
+        required: [case_id]
+      responses:
+        '200': {description: OK}
+        '400': {description: Validation or request error}
+        '401': {description: Authentication required}
+        '409': {description: Approval stale (packet/generate)}
+        '429': {description: Rate limited}
+  /api/v1/integrations/agents:
+    get:
+      summary: List tenant agents.
+      responses:
+        '200': {description: OK}
+        '401': {description: Authentication required}
+        '403': {description: Forbidden (scope/tenant)}
+        '404': {description: Not found}
+  /api/v1/integrations/cases:
+    get:
+      summary: List tenant cases.
+      responses:
+        '200': {description: OK}
+        '401': {description: Authentication required}
+        '403': {description: Forbidden (scope/tenant)}
+        '404': {description: Not found}
+  /api/v1/integrations/cases/{case_id}:
+    get:
+      summary: Get one tenant case.
+      responses:
+        '200': {description: OK}
+        '401': {description: Authentication required}
+        '403': {description: Forbidden (scope/tenant)}
+        '404': {description: Not found}
+  /api/v1/integrations/cases/{case_id}/audit:
+    get:
+      summary: Audit trail for a case.
+      responses:
+        '200': {description: OK}
+        '401': {description: Authentication required}
+        '403': {description: Forbidden (scope/tenant)}
+        '404': {description: Not found}
+  /api/v1/integrations/monitoring:
+    get:
+      summary: Tenant monitoring snapshot.
+      responses:
+        '200': {description: OK}
+        '401': {description: Authentication required}
+        '403': {description: Forbidden (scope/tenant)}
+        '404': {description: Not found}
+  /api/v1/integrations/webhooks:
+    get:
+      summary: List webhook subscriptions.
+      responses:
+        '200': {description: OK}
+        '401': {description: Authentication required}
+        '403': {description: Forbidden (scope/tenant)}
+        '404': {description: Not found}
+  /api/v1/integrations/cases:
+    post:
+      summary: Integration endpoint /api/v1/integrations/cases.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+        type: object
+        properties:
+          case_id:
+            type: string
+            maxLength: 128
+          external_case_id:
+            type: string
+            maxLength: 256
+          external_system:
+            type: string
+            maxLength: 128
+          external_folio_id:
+            type: string
+            maxLength: 256
+          external_transaction_id:
+            type: string
+            maxLength: 256
+          property_id:
+            type: string
+            maxLength: 128
+          notice:
+            type: object
+          folio:
+            type: object
+      responses:
+        '200': {description: OK}
+        '201': {description: Created}
+        '400': {description: Validation or request error}
+        '401': {description: Authentication required}
+        '403': {description: Forbidden (scope/tenant)}
+  /api/v1/integrations/cases/{case_id}/documents:
+    post:
+      summary: Integration endpoint /api/v1/integrations/cases/{case_id}/documents.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+        type: object
+        properties:
+          document_type:
+            type: string
+            maxLength: 64
+          filename:
+            type: string
+            maxLength: 512
+          media_type:
+            type: string
+            maxLength: 128
+          content_base64:
+            type: string
+            maxLength: 30000000
+          evidence_doc_type:
+            type: string
+            maxLength: 128
+        required: [document_type, filename, content_base64]
+      responses:
+        '200': {description: OK}
+        '201': {description: Created}
+        '400': {description: Validation or request error}
+        '401': {description: Authentication required}
+        '403': {description: Forbidden (scope/tenant)}
+  /api/v1/integrations/webhooks:
+    post:
+      summary: Integration endpoint /api/v1/integrations/webhooks.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+        type: object
+        properties:
+          url:
+            type: string
+            maxLength: 2048
+          event_types:
+            type: array
+          secret:
+            type: string
+            maxLength: 512
+          description:
+            type: string
+            maxLength: 512
+        required: [url]
+      responses:
+        '200': {description: OK}
+        '201': {description: Created}
+        '400': {description: Validation or request error}
+        '401': {description: Authentication required}
+        '403': {description: Forbidden (scope/tenant)}
+  /api/v1/integrations/agents/{agent_id}/heartbeat:
+    post:
+      summary: Agent heartbeat / liveness.
+      responses:
+        '200': {description: OK}
+        '401': {description: Authentication required}
+        '403': {description: Forbidden (scope/tenant)}
+        '404': {description: Not found}
+  /api/v1/integrations/cases/{case_id}/draft:
+    post:
+      summary: Draft a rebuttal (machine processing, not approval).
+      responses:
+        '200': {description: OK}
+        '401': {description: Authentication required}
+        '403': {description: Forbidden (scope/tenant)}
+        '404': {description: Not found}
+  /api/v1/integrations/cases/{case_id}/packet:
+    post:
+      summary: Generate a packet from an explicit human approval reference.
+      responses:
+        '200': {description: OK}
+        '401': {description: Authentication required}
+        '403': {description: Forbidden (scope/tenant)}
+        '404': {description: Not found}
+  /api/v1/integrations/cases/{case_id}/process:
+    post:
+      summary: Reconcile + draft. Returns approval: null, human_approval_required: true.
+      responses:
+        '200': {description: OK}
+        '401': {description: Authentication required}
+        '403': {description: Forbidden (scope/tenant)}
+        '404': {description: Not found}
+  /api/v1/integrations/cases/{case_id}/reconcile:
+    post:
+      summary: Reconcile a case.
+      responses:
+        '200': {description: OK}
+        '401': {description: Authentication required}
+        '403': {description: Forbidden (scope/tenant)}
+        '404': {description: Not found}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >-
+        Legacy endpoints: the shared FOLIOSHIELD_API_KEY. Integration
+        endpoints: a tenant credential (<credential_id>.<secret>).

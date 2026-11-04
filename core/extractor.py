@@ -159,7 +159,23 @@ def _infer_booking_channel(text: str) -> Optional[str]:
 
 
 def _infer_stay_status(text: str, line_items: List[Dict[str, Any]]) -> Optional[str]:
-    """Infers stay status; never fabricates occupancy for no-show/cancelled folios."""
+    """Infers stay status; never fabricates occupancy for no-show/cancelled folios.
+
+    An explicit ``Stay Status:`` field wins over keyword inference: folio
+    boilerplate (cancellation-policy wording, refund language) must not turn
+    an occupied stay into a cancelled one.
+    """
+    explicit = _search(r'\bStay\s*Status\s*:?\s*([A-Za-z][A-Za-z _-]*)', text)
+    if explicit:
+        normalized = explicit.strip().lower().replace("-", "_").replace(" ", "_")
+        mapping = {
+            "occupied": "occupied", "checked_in": "occupied", "checked_out": "occupied",
+            "in_house": "occupied", "cancelled": "cancelled", "canceled": "cancelled",
+            "no_show": "no_show", "noshow": "no_show",
+            "early_departure": "early_departure", "day_use": "day_use",
+        }
+        if normalized in mapping:
+            return mapping[normalized]
     lowered = text.lower()
     if re.search(r'no-?show', lowered):
         return "no_show"
@@ -178,6 +194,68 @@ class DocumentExtractor:
     """
     Handles extraction from Bank Dispute Notices and Hotel Guest Folios.
     """
+
+    @staticmethod
+    def pdf_first_page_to_image(file_bytes: bytes, zoom: float = 2.0) -> bytes:
+        """
+        Renders the first page of a PDF to PNG bytes for vision analysis.
+
+        Uses pypdfium2 (installed with the `streamlit[pdf]` extra), falling
+        back to PyMuPDF when available. Raises ExtractionError with install
+        guidance when no renderer is available or the PDF has no pages —
+        it never fabricates an image.
+        """
+        try:
+            import pypdfium2 as pdfium
+        except ImportError:
+            pdfium = None
+        if pdfium is not None:
+            try:
+                doc = pdfium.PdfDocument(file_bytes)
+                try:
+                    if len(doc) == 0:
+                        raise ExtractionError("The uploaded PDF has no pages to analyze.")
+                    page = doc[0]
+                    try:
+                        bitmap = page.render(scale=zoom)
+                        try:
+                            image = bitmap.to_pil()
+                        finally:
+                            bitmap.close()
+                    finally:
+                        page.close()
+                finally:
+                    doc.close()
+                import io
+
+                buffer = io.BytesIO()
+                image.save(buffer, format="PNG")
+                return buffer.getvalue()
+            except ExtractionError:
+                raise
+            except Exception as exc:
+                raise ExtractionError(
+                    f"Could not render the PDF first page for vision analysis: {exc}"
+                ) from exc
+        try:
+            import fitz  # PyMuPDF
+        except ImportError as exc:
+            raise ExtractionError(
+                "PDF vision preview requires a PDF renderer. Install it with: "
+                'pip install "streamlit[pdf]" (or pip install PyMuPDF), then retry. '
+                "Image uploads (PNG/JPG) work without it."
+            ) from exc
+        try:
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            if doc.page_count == 0:
+                raise ExtractionError("The uploaded PDF has no pages to analyze.")
+            page = doc.load_page(0)
+            pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
+            return pix.tobytes("png")
+        except ExtractionError:
+            raise
+        except Exception as exc:
+            raise ExtractionError(f"Could not render the PDF first page for vision analysis: {exc}") from exc
 
     @staticmethod
     def extract_text_from_pdf(file_bytes: bytes) -> str:
@@ -387,7 +465,9 @@ class DocumentExtractor:
         folio["guest_name"] = _search(r'\bGuest\s*Name\s*:\s*(.+?)(?=\s+[A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*)?\s*:|\s*$)', text)
         folio["folio_number"] = _search(r'\b(?:Folio|Invoice)\s*(?:Number|No\.?|#|ID)\s*:?\s*([A-Z0-9][A-Z0-9\-]{3,})', text)
         folio["confirmation_number"] = _search(r'\b(?:Confirmation|Reservation|Booking)\s*(?:Number|No\.?|#|ID|Code)\s*:?\s*([A-Z0-9][A-Z0-9\-]{3,})', text)
-        folio["room_number"] = _search(r'\b(?:Room\s*(?:Number|No\.?|#)|Rm\.?)\s*:?\s*([A-Z]?\d{1,5}[A-Z]?)\b', text)
+        folio["room_number"] = _search(r'\bRoom\s*(?:Number|No\.?|#)?\s*:?\s*([A-Za-z][A-Za-z ]*\d+[A-Za-z]?|\d{1,5}[A-Za-z]?)\b', text)
+        if not folio["room_number"]:
+            folio["room_number"] = _search(r'\bRoom\s*:?\s*([A-Z]?\d{1,5}[A-Z]?)\b', text)
         folio["check_in"] = _search(r'\b(?:Arrival(?:\s*Date)?|Check-?\s?in(?:\s*Date)?)\s*:?\s*' + _DATE, text)
         folio["check_out"] = _search(r'\b(?:Departure(?:\s*Date)?|Check-?\s?out(?:\s*Date)?)\s*:?\s*' + _DATE, text)
         folio["check_in_time"] = _search(r'\bCheck-?\s?in\s*Time\s*:?\s*' + _TIME, text)
@@ -452,15 +532,81 @@ class DocumentExtractor:
             item_type = "Credit" if is_credit else "Charge"
             # Preserve a trailing voucher/reference token (e.g. "POS-9812", "#4102").
             ref_match = re.search(r'\b(?:Ref\.?|Voucher|Slip|Check|Auth)[:#]?\s*([A-Z0-9][A-Z0-9\-]{2,})\s*$', desc, re.I) or re.search(r'\(([A-Z0-9\-]{3,})\)\s*$', desc)
+            # Explicit disputed markers from PMS/folio exports.
+            is_disputed = bool(re.search(r'\[DISPUTED[^\]]*\]|\bDISPUTED\b', desc, re.I)) or None
+            clean_desc = re.sub(r'\s*\[DISPUTED[^\]]*\]\s*', ' ', desc, flags=re.I).strip()
+            clean_desc = re.sub(r'\s+\bDISPUTED\b\s*$', '', clean_desc, flags=re.I).strip()
             line_items.append({
                 "date": m_item.group(1),
-                "description": desc,
+                "description": clean_desc or desc,
                 "amount": amount,
                 "type": item_type,
                 "reference": ref_match.group(1) if ref_match else None,
-                "category": categorize_line_item(desc, item_type),
-                "disputed": None,
+                "category": categorize_line_item(clean_desc or desc, item_type),
+                "disputed": is_disputed,
             })
+
+        # Multi-line (column-flattened) folio tables: PDF text extraction often
+        # puts date / description / reference / category / amount on separate
+        # lines, so the single-line regex above finds nothing. Reassemble
+        # records anchored on each date line: description lines (possibly
+        # wrapping, e.g. a "[DISPUTED TEST LINE]" marker), then reference,
+        # category, and finally the amount line.
+        if not line_items:
+            flat = [ln.strip() for ln in text.splitlines() if ln.strip()]
+            date_re = re.compile(r'^\d{4}-\d{2}-\d{2}$|^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$')
+            amount_re = re.compile(r'^-?\$?-?[0-9][0-9,]*\.[0-9]{2}$')
+            ref_re = re.compile(r'^[A-Z]{2,}[A-Z0-9]*-[A-Z0-9\-]+$|^[A-Z0-9]{4,}$')
+            i = 0
+            while i < len(flat):
+                if not date_re.match(flat[i]):
+                    i += 1
+                    continue
+                # Collect lines until the amount line (max 6 lines ahead).
+                j = i + 1
+                while j < len(flat) and j <= i + 6 and not amount_re.match(flat[j]) and not date_re.match(flat[j]):
+                    j += 1
+                if j >= len(flat) or not amount_re.match(flat[j]) or j == i + 1:
+                    i += 1
+                    continue
+                middle = flat[i + 1:j]
+                amount_text = flat[j]
+                # Reference/category are the trailing non-description lines.
+                ref_val = None
+                cat_val = None
+                desc_lines = list(middle)
+                if len(middle) >= 3 and ref_re.match(middle[-2]):
+                    ref_val = middle[-2]
+                    cat_val = middle[-1]
+                    desc_lines = middle[:-2]
+                elif len(middle) >= 2 and ref_re.match(middle[-1]):
+                    ref_val = middle[-1]
+                    desc_lines = middle[:-1]
+                desc = " ".join(desc_lines).strip()
+                if any(skip in desc.lower() for skip in ("total", "balance", "subtotal")):
+                    i = j + 1
+                    continue
+                # Header metadata lines (e.g. "Booking Date:" followed by a
+                # rate line ending in the nightly rate) are not charges.
+                if re.search(r':\s*$', desc) or re.match(
+                        r'(?i)^(booking|reservation|rate plan|rate per night|guest|folio|room|arrival|departure|stay|check|merchant|auth|avs|cvv|entry|cancellation|refund|payer|confirmation)\b', desc):
+                    i = j + 1
+                    continue
+                amount = _to_amount(amount_text.replace("-", ""))
+                is_credit = "-" in amount_text or bool(re.search(r'payment|credit|settlement|\brefund(?:ed|s|ing)?\b', desc, re.I)) and not bool(re.search(r'non-refundable', desc, re.I))
+                item_type = "Credit" if is_credit else "Charge"
+                is_disputed = bool(re.search(r'\[DISPUTED[^\]]*\]|\bDISPUTED\b', desc, re.I)) or None
+                clean_desc = re.sub(r'\s*\[DISPUTED[^\]]*\]\s*', ' ', desc, flags=re.I).strip()
+                line_items.append({
+                    "date": flat[i],
+                    "description": clean_desc or desc,
+                    "amount": amount,
+                    "type": item_type,
+                    "reference": ref_val,
+                    "category": cat_val or categorize_line_item(clean_desc or desc, item_type),
+                    "disputed": is_disputed,
+                })
+                i = j + 1
 
         folio["line_items"] = line_items
         if line_items:
@@ -500,7 +646,7 @@ class DocumentExtractor:
         exact = {"date": "date", "description": "description", "desc": "description",
                  "credit": "credit", "payment": "credit", "charge": "amount",
                  "amount": "amount", "debit": "amount", "reference": "reference",
-                 "category": "category"}
+                 "category": "category", "disputed": "disputed", "contested": "disputed"}
         for col in df.columns:
             canonical = exact.get(str(col).strip().lower())
             if canonical and canonical not in col_map.values():
@@ -552,14 +698,20 @@ class DocumentExtractor:
 
             item_type = "Credit" if is_credit else "Charge"
             category = str(row.get("category") or "").strip() or categorize_line_item(desc, item_type)
+            # Explicit disputed markers from PMS exports (e.g. a "Disputed"
+            # column or a [DISPUTED] tag in the description).
+            disputed_raw = str(row.get("disputed") or "").strip().lower()
+            is_disputed = True if disputed_raw in ("true", "yes", "y", "1", "disputed") else (
+                bool(re.search(r'\[DISPUTED[^\]]*\]|\bDISPUTED\b', desc, re.I)) or None)
+            clean_desc = re.sub(r'\s*\[DISPUTED[^\]]*\]\s*', ' ', desc, flags=re.I).strip()
             line_items.append({
                 "date": date_val,
-                "description": desc,
+                "description": clean_desc or desc,
                 "amount": round(amt, 2),
                 "type": item_type,
                 "reference": reference,
                 "category": category,
-                "disputed": None,
+                "disputed": is_disputed,
             })
 
         dated = [i["date"] for i in line_items if i["date"]]
@@ -608,3 +760,148 @@ class DocumentExtractor:
             "line_items": line_items,
             "raw_text": f"CSV import with {len(line_items)} entries",
         }
+
+    @classmethod
+    def extract_evidence_details(cls, doc_type: str, filename: str, file_bytes: bytes) -> Dict[str, Any]:
+        """
+        Extracts probative evidence details from uploaded evidence files (CSV, EML, PDF, TXT).
+        Only parses facts explicitly present in the file; never invents details.
+        """
+        details: Dict[str, Any] = {}
+        fn = (filename or "").lower()
+
+        text = ""
+        if fn.endswith(".pdf"):
+            try:
+                text = cls.extract_text_from_pdf(file_bytes)
+            except Exception:
+                text = ""
+        elif fn.endswith((".csv", ".txt", ".eml", ".log", ".json")):
+            try:
+                text = file_bytes.decode("utf-8", errors="replace")
+            except Exception:
+                text = ""
+
+        # 1. Lock and WiFi logs (CSV, TXT, PDF)
+        if doc_type in ("keycard_lock_audit", "wifi_usage_log"):
+            ts_entries: List[str] = []
+            if fn.endswith(".csv") or "," in text:
+                import csv as _csv
+                try:
+                    reader = _csv.reader(io.StringIO(text))
+                    header = next(reader, None)
+                    if header:
+                        ts_idx = 0
+                        for idx, h in enumerate(header):
+                            if any(k in h.lower() for k in ("time", "date", "ts")):
+                                ts_idx = idx
+                                break
+                        for row in reader:
+                            if row and len(row) > ts_idx:
+                                val = row[ts_idx].strip()
+                                if re.match(r'^\d{4}-\d{2}-\d{2}', val) or re.match(r'^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', val):
+                                    ts_entries.append(val)
+                except Exception:
+                    pass
+
+            if not ts_entries and text:
+                for line in text.splitlines():
+                    m = re.search(r'\b(\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?)\b', line)
+                    if m:
+                        ts_entries.append(m.group(1).strip())
+
+            m_first = re.search(r'(?:first_entry|first_seen|first\s*entry|first\s*seen)\s*[:=]?\s*["\']?([0-9]{4}-[0-9]{2}-[0-9]{2}[^"\'\r\n,]*)', text, re.I)
+            m_last = re.search(r'(?:last_entry|last_seen|last\s*entry|last\s*seen)\s*[:=]?\s*["\']?([0-9]{4}-[0-9]{2}-[0-9]{2}[^"\'\r\n,]*)', text, re.I)
+
+            if m_first:
+                details["first_entry"] = m_first.group(1).strip()
+                if doc_type == "wifi_usage_log":
+                    details["first_seen"] = m_first.group(1).strip()
+            elif ts_entries:
+                details["first_entry"] = ts_entries[0]
+                if doc_type == "wifi_usage_log":
+                    details["first_seen"] = ts_entries[0]
+
+            if m_last:
+                details["last_entry"] = m_last.group(1).strip()
+                if doc_type == "wifi_usage_log":
+                    details["last_seen"] = m_last.group(1).strip()
+            elif ts_entries:
+                details["last_entry"] = ts_entries[-1]
+                if doc_type == "wifi_usage_log":
+                    details["last_seen"] = ts_entries[-1]
+
+            m_entries = re.search(r'(?:entries|count)\s*[:=]?\s*(\d+)', text, re.I)
+            if m_entries:
+                details["entries"] = int(m_entries.group(1))
+            elif ts_entries:
+                details["entries"] = len(ts_entries)
+
+        # 2. Booking confirmation (EML, TXT, PDF)
+        elif doc_type == "booking_confirmation":
+            m_rec = (re.search(r'(?:recipient|sent_to|sent\s*to)\s*[:=]?\s*["\']?([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})', text, re.I)
+                     or re.search(r'To:\s*(?:[^<\r\n]+<)?([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})', text, re.I))
+            if m_rec:
+                details["recipient"] = m_rec.group(1).strip()
+            m_sent = (re.search(r'(?:sent_at|sent_timestamp|sent\s*at)\s*[:=]?\s*["\']?([^"\'\r\n]+)', text, re.I)
+                      or re.search(r'Date:\s*([A-Za-z0-9, :+-]+)', text, re.I))
+            if m_sent:
+                details["sent_at"] = m_sent.group(1).strip()
+
+        # 3. Cancellation policy acceptance (PDF, TXT)
+        elif doc_type == "cancellation_policy_acceptance":
+            m_acc = re.search(r'(?:accepted_at|acceptance_timestamp|clicked_at|accepted\s*at)\s*[:=]?\s*["\']?([^"\'\r\n]+)', text, re.I)
+            if m_acc:
+                details["accepted_at"] = m_acc.group(1).strip()
+            m_pol = re.search(r'(?:policy_text|exact_text|policy\s*wording)\s*[:=]?\s*["\']?([^"\'\r\n]+)', text, re.I)
+            if m_pol:
+                details["policy_text"] = m_pol.group(1).strip()
+
+        # 4. POS Signed Slips (PDF, TXT)
+        elif doc_type == "pos_signed_slips":
+            m_slips = re.search(r'\[\s*\{.*?"reference".*?\}\s*\]', text, re.S)
+            if m_slips:
+                try:
+                    import json as _json
+                    parsed = _json.loads(m_slips.group(0))
+                    if isinstance(parsed, list) and parsed:
+                        details["slips"] = parsed
+                except Exception:
+                    pass
+            if "slips" not in details:
+                m_ref = re.search(r'(?:slip_reference|slip_ref|reference)\s*[:=]?\s*["\']?([A-Za-z0-9\-]+)', text, re.I)
+                m_amt = re.search(r'(?:slip\s*amount|amount)\s*[:=]?\s*["\']?\$?([0-9]+\.[0-9]{2})', text, re.I)
+                if m_ref or m_amt:
+                    ref_val = m_ref.group(1).strip() if m_ref else None
+                    amt_val = float(m_amt.group(1)) if m_amt else None
+                    if ref_val:
+                        details["slip_reference"] = ref_val
+                    if amt_val is not None:
+                        details["amount"] = amt_val
+                    details["slips"] = [{"reference": ref_val, "amount": amt_val}]
+
+        # 5. AVS / CVV result
+        elif doc_type == "avs_cvv_result":
+            m_avs = re.search(r'\bAVS\s*(?:Result|Response|Code)?\s*[:=]?\s*([A-Za-z](?:\s*[-–]\s*[A-Za-z ]+)?)', text, re.I)
+            if m_avs:
+                details["avs_result"] = m_avs.group(1).strip()
+            m_cvv = re.search(r'\b(?:CVV2?|CVC2?|CID)\s*(?:Result|Response)?\s*[:=]?\s*(Match|No\s*Match|Not\s*Provided|[A-Za-z])\b', text, re.I)
+            if m_cvv:
+                details["cvv_result"] = m_cvv.group(1).strip()
+
+        # 6. Guest service log
+        elif doc_type == "guest_service_log":
+            m_unres = re.search(r'(?:unresolved_complaints|open_complaints|unresolved)\s*[:=]?\s*(\d+)', text, re.I)
+            if m_unres:
+                details["unresolved_complaints"] = int(m_unres.group(1))
+
+        # 7. Refund credit receipt
+        elif doc_type == "refund_credit_receipt":
+            m_amt = re.search(r'(?:refund\s*amount|amount)\s*[:=]?\s*["\']?\$?([0-9]+\.[0-9]{2})', text, re.I)
+            if m_amt:
+                details["amount"] = float(m_amt.group(1))
+            m_ref = re.search(r'(?:refund\s*reference|reference|ref)\s*[:=]?\s*["\']?([A-Za-z0-9\-]+)', text, re.I)
+            if m_ref:
+                details["reference"] = m_ref.group(1).strip()
+
+        return details

@@ -1,0 +1,29 @@
+From: reservations@grandhorizonresort.example
+To: jonathan.davis@example.com
+Subject: Booking Confirmation GH-884120 - Grand Horizon Resort & Suites
+Date: Mon, 28 Sep 2026 14:02:00 +0000
+Content-Type: text/plain; charset=utf-8
+
+Dear Jonathan C. Davis,
+
+Thank you for booking with Grand Horizon Resort & Suites.
+
+Confirmation number: GH-884120
+Property: Grand Horizon Resort & Suites, 100 Ocean Avenue, Miami Beach, FL 33139
+Arrival: 2026-10-10
+Departure: 2026-10-13
+Room: 412
+Rate plan: Best Available Rate
+Nightly rate: $320.00 plus taxes and resort fee
+
+Cancellation policy: Free cancellation until 48 hours before arrival. After that time, the first night plus tax is charged. No-show reservations are charged the first night plus tax.
+
+Your reservation was guaranteed with the card ending in 4821. Authorization and booking terms were presented before booking completion.
+
+We look forward to welcoming you.
+
+Grand Horizon Resort & Suites
+Reservations Department
+
+---
+Synthetic test message generated for FolioShield workflow testing.

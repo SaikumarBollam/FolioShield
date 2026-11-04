@@ -5,7 +5,12 @@ Property Management Systems (OPERA, Cloudbeds, Mews), and Building/Hotel Managem
 """
 
 import base64
+import time
+import uuid
 from typing import Dict, Any, Optional, Union
+
+import requests
+
 from .models import NoticeData, FolioData, DisputePacketResponse, SubmissionRecord, OutcomeRecord
 from .extractor import DocumentExtractor
 from .reconciler import Reconciler
@@ -144,12 +149,17 @@ class FolioShield:
         approved_at: Optional[str] = None,
         policy_text: Optional[str] = None,
         approval_fingerprint: Optional[str] = None,
-        chain_head: Optional[Dict[str, Any]] = None
+        chain_head: Optional[Dict[str, Any]] = None,
+        packet_format: str = "executive",
+        exhibit_files: Optional[Dict[str, bytes]] = None
     ) -> bytes:
         """
         Two-pass packet build: pass 1 computes the packet SHA-256, pass 2
         embeds it (plus approval fingerprint + chain head) in the p.3 custody
         block so the downloaded file is self-verifying.
+
+        packet_format="executive" produces exactly 3 pages (default, unchanged).
+        packet_format="complete" appends an exhibit appendix after page 3.
         """
         n_dict = notice.to_dict() if isinstance(notice, NoticeData) else notice
         f_dict = folio.to_dict() if isinstance(folio, FolioData) else folio
@@ -159,6 +169,7 @@ class FolioShield:
             n_dict, f_dict, reconciliation, rebuttal_text,
             approved_by=approved_by, approved_at=approved_at, policy_text=policy_text,
             approval_fingerprint=approval_fingerprint, chain_head=chain_head,
+            packet_format=packet_format, exhibit_files=exhibit_files,
         )
         packet_hash = AuditLogger.calculate_sha256(first_pass)
         return EvidencePacketGenerator.generate_packet(
@@ -166,6 +177,7 @@ class FolioShield:
             approved_by=approved_by, approved_at=approved_at, policy_text=policy_text,
             approval_fingerprint=approval_fingerprint, chain_head=chain_head,
             packet_sha256=packet_hash,
+            packet_format=packet_format, exhibit_files=exhibit_files,
         )
 
     def process_dispute(
@@ -218,31 +230,33 @@ class FolioShield:
             "engine": self.llama_engine.last_engine_used
         }, user=reviewer_name)
 
-        # Approval parity (Phase 5): canonical fingerprint + approval event,
-        # so headless packets carry the same custody guarantees as the UI.
+        # Machine processing (Phase 1 P0): drafting is NOT human approval.
+        # No approval event is recorded here and the packet is a draft
+        # ("Pending approval") until a named human calls approve_dispute()
+        # and its fingerprint is supplied for the final packet.
         from .fingerprint import case_fingerprint as _case_fp
         fp = _case_fp(n_data.to_dict(), f_data.to_dict(),
                       recon.get("evidence_items") and {i["doc_type"]: i for i in recon["evidence_items"]} or {},
                       rebuttal, policy_text or "", custom_instructions or "", self.merchant_name or "")
-        approval_event = self.audit_logger.log_event("api_rebuttal_approved", {
+        self.audit_logger.log_event("api_rebuttal_processed", {
             "case_id": n_data.case_id,
             "fingerprint": fp["fingerprint"],
             "fingerprint_version": fp["version"],
             "rebuttal_sha256": AuditLogger.calculate_sha256(rebuttal.encode("utf-8")),
-            "gate_override": False,
+            "human_approval_required": True,
             "readiness_submittable": (recon.get("evidence_readiness") or {}).get("submittable"),
-            "message": "Headless approval recorded by SDK/API pipeline",
+            "message": "Headless machine processing completed by SDK/API pipeline; human approval still required",
         }, user=reviewer_name)
 
-        # Generate PDF if requested
+        # Generate PDF if requested (draft — no approval fingerprint embedded)
         pdf_b64 = None
         sha_digest = None
         if generate_pdf:
             pdf_bytes = self.generate_pdf_packet_hashed(
                 n_data, f_data, recon, rebuttal,
-                approved_by=reviewer_name,
+                approved_by=None,
                 policy_text=policy_text,
-                approval_fingerprint=fp["fingerprint"],
+                approval_fingerprint=None,
                 chain_head=self.audit_logger.chain_head,
             )
             sha_digest = AuditLogger.calculate_sha256(pdf_bytes)
@@ -250,7 +264,7 @@ class FolioShield:
             self.audit_logger.log_event("api_packet_generated", {
                 "case_id": n_data.case_id,
                 "sha256": sha_digest,
-                "approval_event_hash": approval_event["event_hash"],
+                "approval_status": "draft_pending_human_approval",
             }, user=reviewer_name)
 
         return DisputePacketResponse(
@@ -264,8 +278,83 @@ class FolioShield:
             discrepancies=recon.get("discrepancies", []),
             audit_highlights=recon.get("audit_highlights", []),
             collection_gaps=recon.get("collection_gaps", []),
-            evidence_items=recon.get("evidence_items", [])
+            evidence_items=recon.get("evidence_items", []),
+            approval=None,
+            human_approval_required=True,
+            approval_fingerprint=fp["fingerprint"],
         )
+
+    def approve_dispute(
+        self,
+        notice: Union[NoticeData, Dict[str, Any]],
+        folio: Union[FolioData, Dict[str, Any]],
+        supporting_docs: Optional[Dict[str, bool]] = None,
+        rebuttal_text: str = "",
+        *,
+        approved_by: str,
+        policy_text: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Records an explicit human approval for a drafted rebuttal.
+
+        This is the ONLY SDK path that creates an approval. The caller (a
+        human-operated system) supplies the approver's name; the approval is
+        bound to the canonical case fingerprint computed from the exact
+        notice/folio/evidence/draft being approved. Returns
+        {approved_by, approved_at, fingerprint, fingerprint_version,
+        event_hash, rebuttal_sha256} for packet generation.
+        """
+        approver = (approved_by or "").strip()
+        if not approver:
+            raise ValueError("approved_by (the human approver's name) is required")
+        if not (rebuttal_text or "").strip():
+            raise ValueError("rebuttal_text is required — approve the actual draft text")
+        n_data = notice if isinstance(notice, NoticeData) else NoticeData.from_dict(notice)
+        f_data = folio if isinstance(folio, FolioData) else FolioData.from_dict(folio)
+        if not f_data.hotel_name:
+            f_data.hotel_name = self.merchant_name
+        recon = self.reconcile(n_data, f_data, supporting_docs=supporting_docs)
+        from .fingerprint import case_fingerprint as _case_fp
+        fp = _case_fp(n_data.to_dict(), f_data.to_dict(),
+                      recon.get("evidence_items") and {i["doc_type"]: i for i in recon["evidence_items"]} or {},
+                      rebuttal_text, policy_text or "", custom_instructions or "", self.merchant_name or "")
+        from datetime import datetime, timezone
+        approved_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        event = self.audit_logger.log_event("rebuttal_approved", {
+            "case_id": n_data.case_id,
+            "fingerprint": fp["fingerprint"],
+            "fingerprint_version": fp["version"],
+            "rebuttal_sha256": AuditLogger.calculate_sha256(rebuttal_text.encode("utf-8")),
+            "via": "sdk_explicit",
+            "gate_override": False,
+            "message": f"Rebuttal approved by {approver} via SDK (explicit human approval)",
+        }, user=approver)
+        return {
+            "approved_by": approver,
+            "approved_at": approved_at,
+            "fingerprint": fp["fingerprint"],
+            "fingerprint_version": fp["version"],
+            "event_hash": event["event_hash"],
+            "rebuttal_sha256": AuditLogger.calculate_sha256(rebuttal_text.encode("utf-8")),
+        }
+
+    def verify_approval(self, notice, folio, supporting_docs, rebuttal_text: str,
+                        approval: Optional[Dict[str, Any]], policy_text: Optional[str] = None,
+                        custom_instructions: Optional[str] = None) -> bool:
+        """True when `approval` exists and its fingerprint matches the current case+draft."""
+        if not approval or not approval.get("fingerprint"):
+            return False
+        n_data = notice if isinstance(notice, NoticeData) else NoticeData.from_dict(notice)
+        f_data = folio if isinstance(folio, FolioData) else FolioData.from_dict(folio)
+        if not f_data.hotel_name:
+            f_data.hotel_name = self.merchant_name
+        recon = self.reconcile(n_data, f_data, supporting_docs=supporting_docs)
+        from .fingerprint import case_fingerprint as _case_fp
+        fp = _case_fp(n_data.to_dict(), f_data.to_dict(),
+                      recon.get("evidence_items") and {i["doc_type"]: i for i in recon["evidence_items"]} or {},
+                      rebuttal_text, policy_text or "", custom_instructions or "", self.merchant_name or "")
+        return fp["fingerprint"] == approval.get("fingerprint")
 
     # ------------------------------------------------------------------ Phase 6
 
@@ -381,3 +470,106 @@ class FolioShield:
             "contents": info["contents"],
         }, user="SDK/API")
         return zip_bytes, info
+
+
+class FolioShieldHTTPClient:
+    """
+    Authenticated HTTP client for the enterprise integration API.
+
+    This class is additive: the local FolioShield SDK above remains unchanged.
+    It sends Bearer credentials, tenant-scoped case requests, idempotency keys,
+    and bounded retries for transient failures. It never logs secrets or payloads.
+    """
+
+    def __init__(self, base_url: str, api_key: str, timeout: int = 30, max_retries: int = 3,
+                 session: Optional[requests.Session] = None):
+        if not base_url:
+            raise ValueError("base_url is required")
+        if not api_key:
+            raise ValueError("api_key is required")
+        self.base_url = base_url.rstrip("/")
+        self._api_key = api_key
+        self.timeout = timeout
+        self.max_retries = max(1, max_retries)
+        self.session = session or requests.Session()
+
+    def _headers(self, idempotency_key: Optional[str] = None) -> Dict[str, str]:
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+            "X-Request-Id": str(uuid.uuid4()),
+        }
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
+        return headers
+
+    def _request(self, method: str, path: str, payload: Optional[Dict[str, Any]] = None,
+                 idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+        url = f"{self.base_url}{path}"
+        last_error: Optional[Exception] = None
+        for attempt in range(self.max_retries):
+            try:
+                response = self.session.request(
+                    method, url, json=payload, headers=self._headers(idempotency_key), timeout=self.timeout)
+                if response.status_code in (429, 502, 503, 504) and attempt < self.max_retries - 1:
+                    time.sleep(min(2 ** attempt, 8))
+                    continue
+                try:
+                    data = response.json()
+                except ValueError:
+                    data = {"status": "error", "error": {"message": "Non-JSON response"}}
+                if response.status_code >= 400:
+                    message = ((data.get("error") or {}).get("message") if isinstance(data, dict) else None) or f"HTTP {response.status_code}"
+                    raise RuntimeError(message)
+                return data
+            except (requests.RequestException, RuntimeError) as exc:
+                last_error = exc
+                if attempt < self.max_retries - 1:
+                    time.sleep(min(2 ** attempt, 8))
+                    continue
+                raise
+        raise RuntimeError(str(last_error) if last_error else "Request failed")
+
+    def create_case(self, case_id: Optional[str] = None, external_system: Optional[str] = None,
+                    external_case_id: Optional[str] = None, external_folio_id: Optional[str] = None,
+                    external_transaction_id: Optional[str] = None, property_id: Optional[str] = None,
+                    notice: Optional[Dict[str, Any]] = None, folio: Optional[Dict[str, Any]] = None,
+                    idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+        return self._request("POST", "/api/v1/integrations/cases", {
+            "case_id": case_id, "external_system": external_system, "external_case_id": external_case_id,
+            "external_folio_id": external_folio_id, "external_transaction_id": external_transaction_id,
+            "property_id": property_id, "notice": notice, "folio": folio,
+        }, idempotency_key=idempotency_key)
+
+    def upload_document(self, case_id: str, document_type: str, filename: str, media_type: str,
+                        data: bytes, evidence_doc_type: Optional[str] = None) -> Dict[str, Any]:
+        return self._request("POST", f"/api/v1/integrations/cases/{case_id}/documents", {
+            "document_type": document_type, "filename": filename, "media_type": media_type,
+            "content_base64": base64.b64encode(data).decode("utf-8"), "evidence_doc_type": evidence_doc_type,
+        })
+
+    def get_case(self, case_id: str) -> Dict[str, Any]:
+        return self._request("GET", f"/api/v1/integrations/cases/{case_id}")
+
+    def reconcile_case(self, case_id: str) -> Dict[str, Any]:
+        return self._request("POST", f"/api/v1/integrations/cases/{case_id}/reconcile", {})
+
+    def draft_case(self, case_id: str, custom_notes: Optional[str] = None) -> Dict[str, Any]:
+        return self._request("POST", f"/api/v1/integrations/cases/{case_id}/draft", {"custom_notes": custom_notes})
+
+    def process_case(self, case_id: str, custom_notes: Optional[str] = None, policy_text: Optional[str] = None) -> Dict[str, Any]:
+        return self._request("POST", f"/api/v1/integrations/cases/{case_id}/process", {
+            "custom_notes": custom_notes, "policy_text": policy_text,
+        })
+
+    def get_audit(self, case_id: str) -> Dict[str, Any]:
+        return self._request("GET", f"/api/v1/integrations/cases/{case_id}/audit")
+
+    def monitoring(self) -> Dict[str, Any]:
+        return self._request("GET", "/api/v1/integrations/monitoring")
+
+    @staticmethod
+    def verify_webhook_signature(secret: str, payload: bytes, timestamp: str, signature: str) -> bool:
+        from .integrations.webhooks import verify_signature
+
+        return verify_signature(secret, payload, timestamp, signature)

@@ -41,6 +41,7 @@
     "booking_source": "Booking.com",
     "booking_date": "2026-10-02",
     "stay_status": "occupied",
+    "guest_email": "priya.nair@example.com",
     "payer_name": "Booking.com B.V.",
     "payer_relationship": "OTA virtual card",
     "entry_mode": "ecommerce",
@@ -102,7 +103,18 @@
       "verified_by": "A. Rivera"
     },
     "id_verification_log": true,
-    "keycard_lock_audit": true,
+    "keycard_lock_audit": {
+      "present": true,
+      "filename": "keycard_audit_nair_517.csv",
+      "sha256": "7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f",
+      "source": "VingCard lock export",
+      "verified_by": "A. Rivera",
+      "details": {
+        "entries": 6,
+        "first_entry": "2026-10-18 16:10",
+        "last_entry": "2026-10-20 11:05"
+      }
+    },
     "booking_confirmation": {
       "present": true,
       "filename": "bookingcom_confirmation_BDC-4412098.pdf",
@@ -110,7 +122,8 @@
       "source": "Booking.com extranet",
       "verified_by": "A. Rivera",
       "details": {
-        "recipient": "guest via Booking.com",
+        "recipient": "priya.nair@example.com",
+        "sent_at": "2026-10-02 11:30 UTC",
         "vcc_terms": "Single-use, stay dates only, max $540.00"
       }
     },
@@ -133,10 +146,14 @@
     },
     {
       "doc_type": "keycard_lock_audit",
-      "generated_file": "evidence/03_keycard_lock_audit.txt",
-      "scenario_filename": null,
+      "generated_file": "evidence/03_keycard_lock_audit.csv",
+      "scenario_filename": "keycard_audit_nair_517.csv",
       "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-      "details_to_enter": {}
+      "details_to_enter": {
+        "entries": 6,
+        "first_entry": "2026-10-18 16:10",
+        "last_entry": "2026-10-20 11:05"
+      }
     },
     {
       "doc_type": "booking_confirmation",
@@ -144,7 +161,8 @@
       "scenario_filename": "bookingcom_confirmation_BDC-4412098.pdf",
       "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
       "details_to_enter": {
-        "recipient": "guest via Booking.com",
+        "recipient": "priya.nair@example.com",
+        "sent_at": "2026-10-02 11:30 UTC",
         "vcc_terms": "Single-use, stay dates only, max $540.00"
       }
     },

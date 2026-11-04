@@ -1,0 +1,18 @@
+Booking Confirmation
+====================
+SYNTHETIC TEST EVIDENCE — generated for FolioShield manual testing.
+
+Hotel: Grand Horizon Resort & Suites
+Guest: Tomas Herrera
+Case ID: V-DISP-87712-R
+Folio: RES-2026-6610
+Confirmation: GH-661000
+Room: — (Cancelled)
+Stay: 2026-10-05 to 2026-10-07
+Document type: booking_confirmation
+Source: PMS confirmation
+Verified by: Revenue Manager
+
+Details:
+- recipient: "tomas.herrera@example.com"
+- sent_at: "2026-09-25 08:45 UTC"

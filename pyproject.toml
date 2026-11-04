@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "folioshield"
+version = "1.1.0"
+description = "Hotel chargeback defense & evidence management"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+dependencies = [
+    "streamlit[pdf]>=1.35.0",
+    "pandas>=2.2.0",
+    "pdfplumber>=0.11.0",
+    "pypdf>=4.2.0",
+    "reportlab>=4.2.0",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "pillow>=10.3.0",
+    "cryptography>=42.0.0",
+]
+
+[tool.setuptools]
+packages = ["core", "core.integrations", "ui", "embedded", "agent", "data"]
+
+[tool.folioshield]
+# Canonical dependency list lives in [project.dependencies] above;
+# requirements.txt mirrors it for plain-pip installs (a test asserts parity).

@@ -39,7 +39,14 @@
     "confirmation_number": "GH-554200",
     "booking_channel": "direct_phone",
     "booking_source": "Reservations Desk",
+    "booking_date": "2026-09-25",
     "stay_status": "occupied",
+    "check_in_time": "4:05 PM",
+    "rate_plan": "Best Available Rate",
+    "guest_email": "marcus.sterling@example.com",
+    "avs_result": "Y - full match",
+    "cvv_result": "Match",
+    "entry_mode": "chip",
     "line_items": [
       {
         "date": "2026-10-02",
@@ -97,9 +104,35 @@
       "source": "Front desk scan",
       "verified_by": "Night Auditor"
     },
-    "emv_terminal_receipt": true,
-    "avs_cvv_result": true,
-    "cancellation_policy_acceptance": true,
+    "emv_terminal_receipt": {
+      "present": true,
+      "filename": "emv_receipt_AX99214.pdf",
+      "sha256": "8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5",
+      "source": "Ingenico terminal T-07",
+      "verified_by": "Night Auditor"
+    },
+    "avs_cvv_result": {
+      "present": true,
+      "filename": "gateway_auth_AX99214.csv",
+      "sha256": "9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6",
+      "source": "Payment gateway",
+      "verified_by": "Night Auditor",
+      "details": {
+        "avs_result": "Y",
+        "cvv_result": "Match"
+      }
+    },
+    "cancellation_policy_acceptance": {
+      "present": true,
+      "filename": "booking_acceptance_GH-554200.pdf",
+      "sha256": "0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7",
+      "source": "Reservations Desk booking record",
+      "verified_by": "Night Auditor",
+      "details": {
+        "accepted_at": "2026-09-25 10:14 UTC",
+        "policy_text": "Free cancellation until 48 hours before arrival; thereafter first night + tax. Incidentals require a signed slip."
+      }
+    },
     "keycard_lock_audit": {
       "present": true,
       "filename": "saflok_audit_PH12.csv",
@@ -112,8 +145,27 @@
         "last_entry": "2026-10-04 11:12"
       }
     },
-    "id_verification_log": true,
-    "booking_confirmation": true,
+    "id_verification_log": {
+      "present": true,
+      "filename": "id_verification_PH12.pdf",
+      "sha256": "1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6",
+      "source": "Front desk ID log",
+      "verified_by": "Night Auditor",
+      "details": {
+        "id_type": "Driver license"
+      }
+    },
+    "booking_confirmation": {
+      "present": true,
+      "filename": "confirmation_email_GH-554200.eml",
+      "sha256": "2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8",
+      "source": "PMS confirmation",
+      "verified_by": "Night Auditor",
+      "details": {
+        "recipient": "marcus.sterling@example.com",
+        "sent_at": "2026-09-25 10:15 UTC"
+      }
+    },
     "pos_signed_slips": {
       "present": true,
       "filename": "pos_slips_4102_778.pdf",
@@ -133,7 +185,16 @@
         ]
       }
     },
-    "guest_service_log": true
+    "guest_service_log": {
+      "present": true,
+      "filename": "service_log_oct02-04.pdf",
+      "sha256": "3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8",
+      "source": "OPERA service log",
+      "verified_by": "Night Auditor",
+      "details": {
+        "unresolved_complaints": 0
+      }
+    }
   },
   "generated_evidence": [
     {
@@ -145,24 +206,30 @@
     },
     {
       "doc_type": "emv_terminal_receipt",
-      "generated_file": "evidence/02_emv_terminal_receipt.txt",
-      "scenario_filename": null,
+      "generated_file": "evidence/02_emv_terminal_receipt.pdf",
+      "scenario_filename": "emv_receipt_AX99214.pdf",
       "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
       "details_to_enter": {}
     },
     {
       "doc_type": "avs_cvv_result",
-      "generated_file": "evidence/03_avs_cvv_result.txt",
-      "scenario_filename": null,
+      "generated_file": "evidence/03_avs_cvv_result.csv",
+      "scenario_filename": "gateway_auth_AX99214.csv",
       "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-      "details_to_enter": {}
+      "details_to_enter": {
+        "avs_result": "Y",
+        "cvv_result": "Match"
+      }
     },
     {
       "doc_type": "cancellation_policy_acceptance",
-      "generated_file": "evidence/04_cancellation_policy_acceptance.txt",
-      "scenario_filename": null,
+      "generated_file": "evidence/04_cancellation_policy_acceptance.pdf",
+      "scenario_filename": "booking_acceptance_GH-554200.pdf",
       "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-      "details_to_enter": {}
+      "details_to_enter": {
+        "accepted_at": "2026-09-25 10:14 UTC",
+        "policy_text": "Free cancellation until 48 hours before arrival; thereafter first night + tax. Incidentals require a signed slip."
+      }
     },
     {
       "doc_type": "keycard_lock_audit",
@@ -177,17 +244,22 @@
     },
     {
       "doc_type": "id_verification_log",
-      "generated_file": "evidence/06_id_verification_log.txt",
-      "scenario_filename": null,
+      "generated_file": "evidence/06_id_verification_log.pdf",
+      "scenario_filename": "id_verification_PH12.pdf",
       "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-      "details_to_enter": {}
+      "details_to_enter": {
+        "id_type": "Driver license"
+      }
     },
     {
       "doc_type": "booking_confirmation",
-      "generated_file": "evidence/07_booking_confirmation.txt",
-      "scenario_filename": null,
+      "generated_file": "evidence/07_booking_confirmation.eml",
+      "scenario_filename": "confirmation_email_GH-554200.eml",
       "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-      "details_to_enter": {}
+      "details_to_enter": {
+        "recipient": "marcus.sterling@example.com",
+        "sent_at": "2026-09-25 10:15 UTC"
+      }
     },
     {
       "doc_type": "pos_signed_slips",
@@ -209,27 +281,32 @@
     },
     {
       "doc_type": "guest_service_log",
-      "generated_file": "evidence/09_guest_service_log.txt",
-      "scenario_filename": null,
+      "generated_file": "evidence/09_guest_service_log.pdf",
+      "scenario_filename": "service_log_oct02-04.pdf",
       "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-      "details_to_enter": {}
+      "details_to_enter": {
+        "unresolved_complaints": 0
+      }
     }
   ],
   "guide": {
     "folder": "03_amex_c08_partial_incidentals",
     "purpose": "Partial dispute where exact-amount signed POS slips decide the contested lines.",
     "steps": [
-      "Upload the Amex notice and folio.",
-      "Confirm disputed lines are Dining $185.00 (POS-4102) and Valet $60.00 (VAL-778).",
-      "Upload pos_signed_slips.pdf; in Probative details, first test only POS-4102/$185.00 and observe partial coverage.",
-      "Then use the generated scenario data or add the second slip reference/amount through the SDK/test data; the supplied evidence text lists both slips.",
-      "Draft, approve, compile, choose Stripe, and build the bundle."
+      "Upload the Amex notice and folio (PDF or CSV).",
+      "In Tab 1 \u2192 Review & Correct Collected Fields, confirm: Stay status = occupied, Room = Penthouse 12, Booking Date 2026-09-25, Rate Plan 'Best Available Rate', Guest Email marcus.sterling@example.com, AVS 'Y - full match', CVV 'Match', Entry Mode 'chip'. (The generated folio PDF prints these; verify the parser picked them up.)",
+      "Confirm disputed lines are Dining $185.00 (POS-4102) and Valet $60.00 (VAL-778) \u2014 the folio marks them [DISPUTED TEST LINE] and the parser scopes them automatically.",
+      "Upload each evidence/ file into its matching Tab 2 slot. For POS Signed Slips, the UI's Probative details form captures ONE slip \u2014 enter slip reference POS-4102 and amount 185.00 there, then note that the second slip (VAL-778, $60.00) is listed inside 08_pos_signed_slips.pdf; full two-slip coverage is proven in the built-in scenario loader / SDK path where details.slips carries both entries.",
+      "For Cancellation Policy Acceptance, enter Accepted at '2026-09-25 10:14 UTC' in Probative details (the exact policy text is inside 04_cancellation_policy_acceptance.txt). For Booking Confirmation, enter recipient marcus.sterling@example.com and sent-at '2026-09-25 10:15 UTC'.",
+      "Draft, approve, compile, choose Stripe, and build the bundle. The draft must NOT claim the reservation was cancelled \u2014 this is an occupied stay."
     ],
     "expected": [
       "Partial dispute is $245.00 of $1,095.00; $850.00 is uncontested.",
       "Disputed-scope proof passes when both marked lines total $245.00.",
-      "POS requirement is dispositive and names any uncovered incidental.",
-      "Exhibit D should identify slip POS-4102 $185.00 and VAL-778 $60.00 in the built-in scenario."
+      "Executive summary uses the partial-dispute variant (signed slips per contested line), never the cancelled-reservation variant.",
+      "Chronology shows booking (2026-09-25), policy acceptance, check-in, keycard entries, and settlement \u2014 with no [MISSING: booking date / policy acceptance / cancellation] anchors for this occupied stay.",
+      "POS requirement is dispositive and names any uncovered incidental until both slips are recorded.",
+      "Exhibit for POS slips identifies slip POS-4102 $185.00 and VAL-778 $60.00 in the built-in scenario."
     ]
   }
 }

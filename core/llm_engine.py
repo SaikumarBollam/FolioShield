@@ -110,7 +110,7 @@ class LlamaEngine:
     def __init__(self, provider: Optional[str] = None, api_key: Optional[str] = None):
         self.provider = (provider or config.llama_provider or OFFLINE_PROVIDER).strip().lower()
         self.config: Optional[ProviderConfig] = PROVIDERS.get(self.provider)
-        env_key = config.get_api_key_for_provider(self.provider) or (os.getenv(self.config.api_key_env) if self.config else None)
+        env_key = config.get_api_key_for_provider(self.provider)
         self.api_key = (api_key or env_key or "").strip()
         self.last_engine_used = "template"
 
@@ -295,10 +295,10 @@ Finance & Revenue Protection Department
     # ------------------------------------------------------------------ provider calls
 
     def _text_model(self) -> str:
-        return config.llama_text_model or os.getenv("LLAMA_TEXT_MODEL") or self.config.text_model  # type: ignore[union-attr]
+        return config.llama_text_model or self.config.text_model  # type: ignore[union-attr]
 
     def _vision_model(self) -> str:
-        return config.llama_vision_model or os.getenv("LLAMA_VISION_MODEL") or self.config.vision_model  # type: ignore[union-attr]
+        return config.llama_vision_model or self.config.vision_model  # type: ignore[union-attr]
 
     def _post(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         assert self.config is not None

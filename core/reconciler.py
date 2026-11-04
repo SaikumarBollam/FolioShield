@@ -90,7 +90,21 @@ def parse_date(value: Any) -> Optional[date]:
 
 
 def _is_file_backed(item: Optional[Dict[str, Any]]) -> bool:
-    return bool(item and item.get("present") and item.get("filename") and item.get("sha256"))
+    """
+    True only when a collected file's bytes are actually retained.
+
+    Callers that hold an exhibit store annotate items with
+    ``bytes_retained`` (see app.current_evidence_items); when annotated,
+    metadata alone (filename + sha256, e.g. reference-case data) is NOT
+    enough — the exhibit must not be cited as "attached" unless its bytes
+    can be bundled. Un-annotated headless callers keep the legacy
+    metadata-based behavior.
+    """
+    if not (item and item.get("present") and item.get("filename") and item.get("sha256")):
+        return False
+    if item.get("bytes_retained") is not None:
+        return bool(item.get("bytes_retained"))
+    return True
 
 
 def _money(value: Any) -> float:
@@ -918,9 +932,18 @@ class Reconciler:
 
             present = v_status in ("satisfied", "weak", "adverse")
             file_backed = _is_file_backed(primary_item) or primary_type in ("__folio__", "__auth__", "__settlement__")
+            metadata_only = bool(
+                primary_item and primary_item.get("filename") and primary_item.get("sha256")
+                and primary_item.get("bytes_retained") is False
+            )
             if v_status == "satisfied":
                 earned_weight += weight * (1.0 if file_backed else 0.6)
-                status_text = "Available (file collected)" if file_backed else "Available (attested)"
+                if file_backed:
+                    status_text = "Available (file collected)"
+                elif metadata_only:
+                    status_text = "Available (metadata only — file not retained; re-upload to attach)"
+                else:
+                    status_text = "Available (attested)"
             elif v_status == "weak":
                 earned_weight += weight * 0.3
                 status_text = "Weak — present but not proven"
@@ -942,6 +965,7 @@ class Reconciler:
                     "doc_type": primary_type, "filename": (primary_item or {}).get("filename"),
                     "sha256": (primary_item or {}).get("sha256"),
                     "file_backed": file_backed,
+                    "bytes_retained": (primary_item or {}).get("bytes_retained"),
                 })
 
             evidence_status.append({

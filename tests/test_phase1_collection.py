@@ -272,6 +272,47 @@ class TestPhase1Collection(unittest.TestCase):
         self.assertIsNone(folio["check_in_time"])
         self.assertEqual(folio["total_charges"], 100.0)
 
+    def test_18_explicit_stay_status_wins_over_policy_boilerplate(self):
+        """Regression (Scenario 3 manual test): an occupied folio whose text
+        mentions 'Cancellation:' must not be inferred as cancelled, named
+        rooms must parse, column-flattened tables must reassemble, and
+        [DISPUTED] markers must scope the partial dispute."""
+        text = (
+            "GRAND HORIZON RESORT & SUITES\n"
+            "Guest Name: Marcus Aurelius Sterling\n"
+            "Folio Number: FOL-2026-5542\n"
+            "Room Number:\nPenthouse 12\n"
+            "Stay Status:\noccupied\n"
+            "Cancellation:\nNot provided\n"
+            "2026-10-02\nPenthouse Suite Accommodations\nRM-PH12\nRoom\n425.00\n"
+            "2026-10-03\nPrivate Cabana Dining (Signed Slip #4102)\n[DISPUTED TEST LINE]\nPOS-4102\nDining\n185.00\n"
+            "2026-10-03\nOvernight Valet Parking [DISPUTED TEST LINE]\nVAL-778\nValet\n60.00\n"
+            "2026-10-04\nAmex Settlement (Auth: AX99214)\nAUTH-AX99214\nPayment\n-1,095.00\n"
+            "Total Charges: $1,095.00\nTotal Payments: $1,095.00\n"
+        )
+        parsed = DocumentExtractor.parse_folio_pdf(text)
+        self.assertEqual(parsed["stay_status"], "occupied")
+        self.assertEqual(parsed["room_number"], "Penthouse 12")
+        self.assertEqual(len(parsed["line_items"]), 4)
+        disputed = [i for i in parsed["line_items"] if i.get("disputed") is True]
+        self.assertEqual(sum(i["amount"] for i in disputed), 245.00)
+        self.assertEqual({i["reference"] for i in disputed}, {"POS-4102", "VAL-778"})
+
+    def test_19_amex_scenario_rebuttal_is_partial_not_cancelled(self):
+        """Regression: Scenario 3 draft must use the partial-dispute summary
+        and carry no booking/policy/cancellation [MISSING] anchors."""
+        scenario = SCENARIOS["amex_partial_c08"]
+        recon = Reconciler.reconcile(scenario["notice"], scenario["folio"], scenario["supporting_docs"])
+        rebuttal = LlamaEngine(provider="mock").draft_rebuttal(scenario["notice"], scenario["folio"], recon)
+        self.assertNotIn("reservation was cancelled", rebuttal)
+        self.assertNotIn("[MISSING: booking date]", rebuttal)
+        self.assertNotIn("[MISSING: policy acceptance timestamp]", rebuttal)
+        self.assertNotIn("[MISSING: cancellation timestamp]", rebuttal)
+        self.assertNotIn("[MISSING: Signed POS slip", rebuttal)
+        self.assertNotIn("[MISSING: No-show policy", rebuttal)
+        self.assertIn("Penthouse 12", rebuttal)
+        self.assertIn("2026-09-25", rebuttal)
+
     def test_16_models_roundtrip_new_fields(self):
         """NoticeData/FolioData/EvidenceItem round-trip the Phase 1 fields."""
         notice = NoticeData.from_dict(SCENARIOS["ota_virtual_card_10_4"]["notice"])

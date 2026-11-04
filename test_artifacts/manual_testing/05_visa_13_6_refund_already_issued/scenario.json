@@ -41,6 +41,7 @@
     "booking_source": "Hotel Website",
     "stay_status": "cancelled",
     "rate_plan": "Flexible - Free Cancellation 48h",
+    "guest_email": "tomas.herrera@example.com",
     "cancellation_timestamp": "2026-10-01 10:05 AM",
     "cancellation_number": "CX-66101",
     "refund_amount": 412.0,
@@ -89,7 +90,17 @@
         "policy_text": "Free cancellation until 48 hours before arrival."
       }
     },
-    "booking_confirmation": true,
+    "booking_confirmation": {
+      "present": true,
+      "filename": "confirmation_email_GH-661000.eml",
+      "sha256": "3d4e5f6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6e",
+      "source": "PMS confirmation",
+      "verified_by": "Revenue Manager",
+      "details": {
+        "recipient": "tomas.herrera@example.com",
+        "sent_at": "2026-09-25 08:45 UTC"
+      }
+    },
     "guest_communication_log": {
       "present": true,
       "filename": "guest_comms_herrera.pdf",
@@ -122,10 +133,13 @@
     },
     {
       "doc_type": "booking_confirmation",
-      "generated_file": "evidence/02_booking_confirmation.txt",
-      "scenario_filename": null,
+      "generated_file": "evidence/02_booking_confirmation.eml",
+      "scenario_filename": "confirmation_email_GH-661000.eml",
       "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-      "details_to_enter": {}
+      "details_to_enter": {
+        "recipient": "tomas.herrera@example.com",
+        "sent_at": "2026-09-25 08:45 UTC"
+      }
     },
     {
       "doc_type": "guest_communication_log",

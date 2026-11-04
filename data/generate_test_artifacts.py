@@ -74,17 +74,20 @@ SCENARIO_GUIDE: dict[str, dict[str, Any]] = {
         "folder": "03_amex_c08_partial_incidentals",
         "purpose": "Partial dispute where exact-amount signed POS slips decide the contested lines.",
         "steps": [
-            "Upload the Amex notice and folio.",
-            "Confirm disputed lines are Dining $185.00 (POS-4102) and Valet $60.00 (VAL-778).",
-            "Upload pos_signed_slips.pdf; in Probative details, first test only POS-4102/$185.00 and observe partial coverage.",
-            "Then use the generated scenario data or add the second slip reference/amount through the SDK/test data; the supplied evidence text lists both slips.",
-            "Draft, approve, compile, choose Stripe, and build the bundle.",
+            "Upload the Amex notice and folio (PDF or CSV).",
+            "In Tab 1 → Review & Correct Collected Fields, confirm: Stay status = occupied, Room = Penthouse 12, Booking Date 2026-09-25, Rate Plan 'Best Available Rate', Guest Email marcus.sterling@example.com, AVS 'Y - full match', CVV 'Match', Entry Mode 'chip'. (The generated folio PDF prints these; verify the parser picked them up.)",
+            "Confirm disputed lines are Dining $185.00 (POS-4102) and Valet $60.00 (VAL-778) — the folio marks them [DISPUTED TEST LINE] and the parser scopes them automatically.",
+            "Upload each evidence/ file into its matching Tab 2 slot. For POS Signed Slips, the UI's Probative details form captures ONE slip — enter slip reference POS-4102 and amount 185.00 there, then note that the second slip (VAL-778, $60.00) is listed inside 08_pos_signed_slips.pdf; full two-slip coverage is proven in the built-in scenario loader / SDK path where details.slips carries both entries.",
+            "For Cancellation Policy Acceptance, enter Accepted at '2026-09-25 10:14 UTC' in Probative details (the exact policy text is inside 04_cancellation_policy_acceptance.txt). For Booking Confirmation, enter recipient marcus.sterling@example.com and sent-at '2026-09-25 10:15 UTC'.",
+            "Draft, approve, compile, choose Stripe, and build the bundle. The draft must NOT claim the reservation was cancelled — this is an occupied stay.",
         ],
         "expected": [
             "Partial dispute is $245.00 of $1,095.00; $850.00 is uncontested.",
             "Disputed-scope proof passes when both marked lines total $245.00.",
-            "POS requirement is dispositive and names any uncovered incidental.",
-            "Exhibit D should identify slip POS-4102 $185.00 and VAL-778 $60.00 in the built-in scenario.",
+            "Executive summary uses the partial-dispute variant (signed slips per contested line), never the cancelled-reservation variant.",
+            "Chronology shows booking (2026-09-25), policy acceptance, check-in, keycard entries, and settlement — with no [MISSING: booking date / policy acceptance / cancellation] anchors for this occupied stay.",
+            "POS requirement is dispositive and names any uncovered incidental until both slips are recorded.",
+            "Exhibit for POS slips identifies slip POS-4102 $185.00 and VAL-778 $60.00 in the built-in scenario.",
         ],
     },
     "ota_virtual_card_10_4": {
@@ -281,7 +284,7 @@ def build_folio_pdf(path: Path, scenario: dict[str, Any]) -> None:
 def build_folio_csv(path: Path, scenario: dict[str, Any]) -> None:
     folio = scenario["folio"]
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["Date", "Description", "Charge", "Credit", "Reference", "Category"])
+        writer = csv.DictWriter(handle, fieldnames=["Date", "Description", "Charge", "Credit", "Reference", "Category", "Disputed"])
         writer.writeheader()
         for item in folio.get("line_items") or []:
             is_credit = item.get("type") == "Credit"
@@ -292,6 +295,7 @@ def build_folio_csv(path: Path, scenario: dict[str, Any]) -> None:
                 "Credit": float(item.get("amount") or 0) if is_credit else 0.0,
                 "Reference": item.get("reference") or "",
                 "Category": item.get("category") or "",
+                "Disputed": "true" if item.get("disputed") is True else "",
             })
 
 
@@ -472,12 +476,19 @@ def main() -> None:
         })
     (OUT_ROOT / "INDEX.json").write_text(json.dumps(index, indent=2, default=str), encoding="utf-8")
 
-    readme = ["# FolioShield Manual Test Artifacts", "", "Upload-ready synthetic fixtures for all six built-in scenarios.", "", "## How to use", "", "1. Start FolioShield.", "2. In the sidebar, choose **Custom Document Upload** (do not use the scenario quick-loader when testing uploads).", "3. Open a scenario folder below.", "4. Upload `01_bank_dispute_notice.pdf` and either `02_guest_folio.pdf` or `02_guest_folio.csv` in Tab 1.", "5. Follow that folder's `TESTING_GUIDE.md`.", "6. Upload files from `evidence/` into matching Tab 2 evidence slots and enter any listed probative details.", "", "## Scenarios", ""]
+    readme = ["# FolioShield Manual Test Artifacts", "", "Upload-ready synthetic fixtures for all six built-in scenarios.", "", "## Complete Evidence Library (all 20 UI evidence types)", "", "If you want a file for **every** evidence slot shown in Tab 2 — including Payment Authorization, Incidentals, Financial Resolution, and Court/Legal items that a single scenario may not need — use:", "", "- `00_complete_evidence_library/README.md` — complete mapping table (UI group → evidence slot → file → values to enter).", "- `00_complete_evidence_library/library_index.json` — machine-readable index for all 20 evidence types.", "", "The library is aligned to the Visa 10.4 reference case so all slots can be exercised together. For realistic amount/reference matching, prefer each scenario folder's own `evidence/` files.", "", "## How to use", "", "1. Start FolioShield.", "2. In the sidebar, choose **New Dispute Case** (do not use the reference-case loader when testing uploads).", "3. Open a scenario folder below.", "4. Upload `01_bank_dispute_notice.pdf` and either `02_guest_folio.pdf` or `02_guest_folio.csv` in Tab 1.", "5. Follow that folder's `TESTING_GUIDE.md`.", "6. Upload files from `evidence/` into matching Tab 2 evidence slots and enter any listed probative details.", "", "## Scenarios", ""]
     for item in index:
         readme.append(f"- **{item['title']}** — `{item['folder']}/`")
     readme += ["", "## Notes", "", "- These are synthetic fixtures, not real bank, identity, payment, or legal documents.", "- Generated evidence hashes differ from demo hashes in `scenario.json`; FolioShield computes actual hashes on upload.", "- Some scenario evidence in the built-in quick-loader is metadata-only. These folders provide actual bytes specifically for upload testing.", "- For the strongest end-to-end test, use Scenario 1 first, then Scenario 3 (partial slips), Scenario 5 (refund), and Scenario 4 (OTA).", ""]
     (OUT_ROOT / "README.md").write_text("\n".join(readme), encoding="utf-8")
     print(f"Generated manual test artifacts in {OUT_ROOT}")
+
+    # Build the complete 20-slot evidence library as well
+    try:
+        from data.generate_complete_evidence_library import main as generate_library
+        generate_library()
+    except Exception as exc:
+        print(f"Notice: Complete evidence library generation skipped: {exc}")
 
 
 if __name__ == "__main__":

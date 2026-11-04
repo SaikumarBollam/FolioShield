@@ -77,7 +77,7 @@ class TestFolioShieldPipeline(unittest.TestCase):
     def test_05_pdf_and_csv_extraction(self):
         """Validates extraction of sample dispute notice and folio documents."""
         # 1. Parse sample notice PDF
-        notice_path = os.path.join("samples", "sample_dispute_notice_visa_10_4.pdf")
+        notice_path = os.path.join("test_artifacts", "manual_testing", "01_visa_10_4_false_fraud", "01_bank_dispute_notice.pdf")
         with open(notice_path, "rb") as f:
             pdf_bytes = f.read()
         extracted_text = DocumentExtractor.extract_text_from_pdf(pdf_bytes)
@@ -89,7 +89,7 @@ class TestFolioShieldPipeline(unittest.TestCase):
         self.assertEqual(parsed_notice["card_last_4"], "4821")
 
         # 2. Parse sample folio CSV
-        csv_path = os.path.join("samples", "sample_hotel_folio_john_davis.csv")
+        csv_path = os.path.join("test_artifacts", "manual_testing", "01_visa_10_4_false_fraud", "02_guest_folio.csv")
         with open(csv_path, "rb") as f:
             csv_bytes = f.read()
         parsed_folio = DocumentExtractor.parse_folio_csv(csv_bytes)
@@ -227,8 +227,18 @@ class TestFolioShieldPipeline(unittest.TestCase):
         self.assertTrue(len(result.pdf_base64) > 1000)
 
     def test_13_api_server_handler_dispatch(self):
-        """Validates zero-dependency HTTP API request handler dispatch directly."""
+        """Validates zero-dependency HTTP API request handler dispatch directly.
+
+        Phase 1 P0: legacy endpoints are fail-closed when no API key is
+        configured in production; this dispatch test explicitly opts into
+        the documented local-development allowance.
+        """
+        import dataclasses
+        from unittest import mock
+
+        import core.api as api_module
         from core.api import FolioShieldAPIHandler
+        from core.config import config as app_config
         import io
         import json
 
@@ -263,7 +273,9 @@ class TestFolioShieldPipeline(unittest.TestCase):
         ).encode("utf-8")
 
         mock_sock = MockSocket(raw_http)
-        handler = FolioShieldAPIHandler(mock_sock, ("127.0.0.1", 12345), None)
+        open_cfg = dataclasses.replace(app_config, api_key=None, api_allow_legacy_unauthenticated=True)
+        with mock.patch.object(api_module, "config", open_cfg):
+            handler = FolioShieldAPIHandler(mock_sock, ("127.0.0.1", 12345), None)
         output_bytes = mock_sock.wfile.getvalue()
         self.assertIn(b"200 OK", output_bytes)
         self.assertIn(b'"status": "success"', output_bytes)

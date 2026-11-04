@@ -1,0 +1,255 @@
+[
+  {
+    "doc_type": "signed_registration_card",
+    "ui_group": "Front Desk Operations",
+    "ui_label": "Signed Registration Card / Digital Check-in",
+    "file": "01_signed_registration_card.png",
+    "details_in_file": {
+      "signature_type": "wet",
+      "check_in_time": "3:15 PM"
+    },
+    "enter_in_ui": "Court provenance: Original type = wet_original; location = Front Desk Records Cabinet.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "id_verification_log",
+    "ui_group": "Front Desk Operations",
+    "ui_label": "Government Photo ID Verified at Front Desk (verification log)",
+    "file": "02_id_verification_log.pdf",
+    "details_in_file": {
+      "id_type": "Driver license",
+      "verified_at": "2026-10-10 15:15"
+    },
+    "enter_in_ui": "Court provenance: Original type = system_export; extracted by Front Desk Supervisor.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "emv_terminal_receipt",
+    "ui_group": "Payment Authorization",
+    "ui_label": "EMV Chip / Contactless Terminal Receipt",
+    "file": "05_emv_terminal_receipt.pdf",
+    "details_in_file": {
+      "auth_code": "AP98231",
+      "entry_mode": "chip",
+      "terminal_id": "T-04"
+    },
+    "enter_in_ui": "Folio fields should show Auth Code AP98231 and Entry Mode chip.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "avs_cvv_result",
+    "ui_group": "Payment Authorization",
+    "ui_label": "AVS / CVV Authorization Result",
+    "file": "06_avs_cvv_authorization_result.txt",
+    "details_in_file": {
+      "avs_result": "Y",
+      "cvv_result": "Match"
+    },
+    "enter_in_ui": "Probative details: AVS result = Y; CVV result = Match.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "three_ds_authentication",
+    "ui_group": "Payment Authorization",
+    "ui_label": "3-D Secure Authentication Record (ECI / CAVV)",
+    "file": "07_3ds_authentication_record.txt",
+    "details_in_file": {
+      "three_ds_status": "authenticated",
+      "eci": "05"
+    },
+    "enter_in_ui": "Folio field: 3-D Secure status / ECI = authenticated 05.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "keycard_lock_audit",
+    "ui_group": "Front Desk Operations",
+    "ui_label": "Electronic Keycard / Door Lock Audit Trail (Onity / Saflok)",
+    "file": "03_keycard_lock_audit.csv",
+    "details_in_file": {
+      "entries": 14,
+      "first_entry": "2026-10-10 15:22",
+      "last_entry": "2026-10-13 10:48"
+    },
+    "enter_in_ui": "Probative details: First entry 2026-10-10 15:22; Last entry 2026-10-13 10:48. Provenance: system Onity HT28 export, Room 412 + stay-date filter.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "pos_signed_slips",
+    "ui_group": "Incidentals & Proof of Use",
+    "ui_label": "POS Signed Slips (restaurant / bar / spa to room)",
+    "file": "11_pos_signed_slips.pdf",
+    "details_in_file": {
+      "slips": [
+        {
+          "reference": "POS-9812",
+          "amount": 87.7
+        },
+        {
+          "reference": "SPA-331",
+          "amount": 53.6
+        }
+      ]
+    },
+    "enter_in_ui": "Probative details UI accepts one slip at a time: enter POS-9812 / 87.70 first. The PDF lists both slips; full multi-slip detail is in library_index.json.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "booking_confirmation",
+    "ui_group": "Booking & Terms",
+    "ui_label": "Booking Confirmation Email (recipient + timestamp)",
+    "file": "08_booking_confirmation.eml",
+    "details_in_file": {
+      "recipient": "jonathan.davis@example.com",
+      "sent_at": "2026-09-28 14:02 UTC"
+    },
+    "enter_in_ui": "Probative details: Recipient = jonathan.davis@example.com; Sent at = 2026-09-28 14:02 UTC.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "cancellation_policy_acceptance",
+    "ui_group": "Booking & Terms",
+    "ui_label": "Cancellation & No-Show Terms Accepted at Booking (exact text + timestamp)",
+    "file": "09_cancellation_policy_acceptance.pdf",
+    "details_in_file": {
+      "accepted_at": "2026-09-28 14:01 UTC",
+      "policy_text": "Free cancellation until 48 hours before arrival; thereafter first night plus tax."
+    },
+    "enter_in_ui": "Probative details: Accepted at = 2026-09-28 14:01 UTC. Paste the policy text into Tab 2 policy box.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "guest_communication_log",
+    "ui_group": "Booking & Terms",
+    "ui_label": "Guest Communication Log (email / phone / message)",
+    "file": "10_guest_communication_log.pdf",
+    "details_in_file": {
+      "channels": [
+        "email"
+      ],
+      "unresolved_dispute_before_chargeback": false
+    },
+    "enter_in_ui": "No required numeric detail. Confirm the log shows no pre-dispute refund request for this case.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "guest_service_log",
+    "ui_group": "Front Desk Operations",
+    "ui_label": "Guest Service Log (no unresolved complaints)",
+    "file": "04_guest_service_log.pdf",
+    "details_in_file": {
+      "unresolved_complaints": 0
+    },
+    "enter_in_ui": "Probative details: Unresolved complaints = 0.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "wifi_usage_log",
+    "ui_group": "Incidentals & Proof of Use",
+    "ui_label": "WiFi / Network Usage Log",
+    "file": "12_wifi_usage_log.csv",
+    "details_in_file": {
+      "first_entry": "2026-10-10 15:31",
+      "last_entry": "2026-10-13 10:20"
+    },
+    "enter_in_ui": "Probative details: First seen 2026-10-10 15:31; Last seen 2026-10-13 10:20.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "incident_damage_evidence",
+    "ui_group": "Incidentals & Proof of Use",
+    "ui_label": "Incident / Damage Evidence (photos, report, signed clause)",
+    "file": "13_incident_damage_evidence.pdf",
+    "details_in_file": {
+      "report_id": "INC-2214",
+      "photos": 6
+    },
+    "enter_in_ui": "Use primarily with the Mastercard 4859 scenario. Do not treat this as a disputed charge on the Visa 10.4 folio.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "refund_credit_receipt",
+    "ui_group": "Financial Resolution",
+    "ui_label": "Refund / Credit Receipt Already Issued",
+    "file": "14_refund_credit_receipt.pdf",
+    "details_in_file": {
+      "scenario_amount": 412.0,
+      "scenario_reference": "RF-884120-6610"
+    },
+    "enter_in_ui": "Use primarily with Visa 13.6. In that scenario enter Refund amount = 412.00 and reference RF-884120-6610.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "clickwrap_record",
+    "ui_group": "Court / Legal Track (Phase 10)",
+    "ui_label": "Booking Clickwrap Record (IP, timestamp, terms version)",
+    "file": "15_booking_clickwrap_record.txt",
+    "details_in_file": {
+      "ip": "203.0.113.42",
+      "accepted_at": "2026-09-28 14:01 UTC",
+      "terms_version": "CANCEL-POL-2026.09"
+    },
+    "enter_in_ui": "Upload in Court/Legal group. Use with the affidavit/clickwrap review in Tab 5.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "cctv_footage",
+    "ui_group": "Court / Legal Track (Phase 10)",
+    "ui_label": "CCTV Footage Export (timestamped)",
+    "file": "16_cctv_footage_export.png",
+    "details_in_file": {
+      "camera": "LOBBY-CAM-02",
+      "timestamp": "2026-10-10 15:14"
+    },
+    "enter_in_ui": "Upload as an image exhibit. In a real case, preserve the original video export and note camera/time range.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "suspect_id_copy",
+    "ui_group": "Court / Legal Track (Phase 10)",
+    "ui_label": "Suspect ID Copy (fraud report; handle per local law)",
+    "file": "17_suspect_id_copy.png",
+    "details_in_file": {
+      "id_type": "Driver license (synthetic)"
+    },
+    "enter_in_ui": "Use only for workflow testing. Real ID copies require lawful handling and restricted access.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "witness_declaration",
+    "ui_group": "Court / Legal Track (Phase 10)",
+    "ui_label": "Witness Declaration (front desk agent)",
+    "file": "18_witness_declaration.pdf",
+    "details_in_file": {
+      "witness": "J. Morales",
+      "linked_events": [
+        "check_in",
+        "id_verified",
+        "key_issued"
+      ]
+    },
+    "enter_in_ui": "Prefer generating the declaration in Tab 5 after registering the witness. This file tests the upload slot.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "demand_letter",
+    "ui_group": "Court / Legal Track (Phase 10)",
+    "ui_label": "Demand Letter (certified mail)",
+    "file": "19_demand_letter.pdf",
+    "details_in_file": {
+      "kind": "demand_letter_template"
+    },
+    "enter_in_ui": "Prefer generating the demand letter in Tab 5 with the computed net loss and pay-by date.",
+    "reference_case": "V-DISP-89214-X"
+  },
+  {
+    "doc_type": "police_report",
+    "ui_group": "Court / Legal Track (Phase 10)",
+    "ui_label": "Police / IC3 Report Filing",
+    "file": "20_police_ic3_report_record.pdf",
+    "details_in_file": {
+      "kind": "filing_record_template"
+    },
+    "enter_in_ui": "Record the actual agency and report number in Tab 5 Filings Tracker after filing.",
+    "reference_case": "V-DISP-89214-X"
+  }
+]

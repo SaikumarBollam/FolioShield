@@ -1,0 +1,18 @@
+Booking Confirmation
+====================
+SYNTHETIC TEST EVIDENCE — generated for FolioShield manual testing.
+
+Hotel: Grand Horizon Resort & Suites
+Guest: Marcus Aurelius Sterling
+Case ID: AX-DISP-11928-C
+Folio: FOL-2026-5542
+Confirmation: GH-554200
+Room: Penthouse 12
+Stay: 2026-10-02 to 2026-10-04
+Document type: booking_confirmation
+Source: PMS confirmation
+Verified by: Night Auditor
+
+Details:
+- recipient: "marcus.sterling@example.com"
+- sent_at: "2026-09-25 10:15 UTC"

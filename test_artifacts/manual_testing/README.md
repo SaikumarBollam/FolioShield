@@ -2,10 +2,19 @@
 
 Upload-ready synthetic fixtures for all six built-in scenarios.
 
+## Complete Evidence Library (all 20 UI evidence types)
+
+If you want a file for **every** evidence slot shown in Tab 2 — including Payment Authorization, Incidentals, Financial Resolution, and Court/Legal items that a single scenario may not need — use:
+
+- `00_complete_evidence_library/README.md` — complete mapping table (UI group → evidence slot → file → values to enter).
+- `00_complete_evidence_library/library_index.json` — machine-readable index for all 20 evidence types.
+
+The library is aligned to the Visa 10.4 reference case so all slots can be exercised together. For realistic amount/reference matching, prefer each scenario folder's own `evidence/` files.
+
 ## How to use
 
 1. Start FolioShield.
-2. In the sidebar, choose **Custom Document Upload** (do not use the scenario quick-loader when testing uploads).
+2. In the sidebar, choose **New Dispute Case** (do not use the reference-case loader when testing uploads).
 3. Open a scenario folder below.
 4. Upload `01_bank_dispute_notice.pdf` and either `02_guest_folio.pdf` or `02_guest_folio.csv` in Tab 1.
 5. Follow that folder's `TESTING_GUIDE.md`.

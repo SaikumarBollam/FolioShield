@@ -99,7 +99,13 @@
         "generated_file": "evidence/10_wifi_usage_log.csv",
         "scenario_filename": "wifi_log_room412.csv",
         "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-        "details_to_enter": {}
+        "details_to_enter": {
+          "entries": 8,
+          "first_entry": "2026-10-10 15:30",
+          "last_entry": "2026-10-13 10:30",
+          "first_seen": "2026-10-10 15:30",
+          "last_seen": "2026-10-13 10:30"
+        }
       }
     ]
   },
@@ -153,7 +159,8 @@
         "scenario_filename": "confirmation_email_GH-773100.eml",
         "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
         "details_to_enter": {
-          "recipient": "eleanor.vance@example.com"
+          "recipient": "eleanor.vance@example.com",
+          "sent_at": "2026-09-20 09:15 UTC"
         }
       },
       {
@@ -194,24 +201,30 @@
       },
       {
         "doc_type": "emv_terminal_receipt",
-        "generated_file": "evidence/02_emv_terminal_receipt.txt",
-        "scenario_filename": null,
+        "generated_file": "evidence/02_emv_terminal_receipt.pdf",
+        "scenario_filename": "emv_receipt_AX99214.pdf",
         "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
         "details_to_enter": {}
       },
       {
         "doc_type": "avs_cvv_result",
-        "generated_file": "evidence/03_avs_cvv_result.txt",
-        "scenario_filename": null,
+        "generated_file": "evidence/03_avs_cvv_result.csv",
+        "scenario_filename": "gateway_auth_AX99214.csv",
         "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-        "details_to_enter": {}
+        "details_to_enter": {
+          "avs_result": "Y",
+          "cvv_result": "Match"
+        }
       },
       {
         "doc_type": "cancellation_policy_acceptance",
-        "generated_file": "evidence/04_cancellation_policy_acceptance.txt",
-        "scenario_filename": null,
+        "generated_file": "evidence/04_cancellation_policy_acceptance.pdf",
+        "scenario_filename": "booking_acceptance_GH-554200.pdf",
         "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-        "details_to_enter": {}
+        "details_to_enter": {
+          "accepted_at": "2026-09-25 10:14 UTC",
+          "policy_text": "Free cancellation until 48 hours before arrival; thereafter first night + tax. Incidentals require a signed slip."
+        }
       },
       {
         "doc_type": "keycard_lock_audit",
@@ -226,17 +239,22 @@
       },
       {
         "doc_type": "id_verification_log",
-        "generated_file": "evidence/06_id_verification_log.txt",
-        "scenario_filename": null,
+        "generated_file": "evidence/06_id_verification_log.pdf",
+        "scenario_filename": "id_verification_PH12.pdf",
         "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-        "details_to_enter": {}
+        "details_to_enter": {
+          "id_type": "Driver license"
+        }
       },
       {
         "doc_type": "booking_confirmation",
-        "generated_file": "evidence/07_booking_confirmation.txt",
-        "scenario_filename": null,
+        "generated_file": "evidence/07_booking_confirmation.eml",
+        "scenario_filename": "confirmation_email_GH-554200.eml",
         "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-        "details_to_enter": {}
+        "details_to_enter": {
+          "recipient": "marcus.sterling@example.com",
+          "sent_at": "2026-09-25 10:15 UTC"
+        }
       },
       {
         "doc_type": "pos_signed_slips",
@@ -258,10 +276,12 @@
       },
       {
         "doc_type": "guest_service_log",
-        "generated_file": "evidence/09_guest_service_log.txt",
-        "scenario_filename": null,
+        "generated_file": "evidence/09_guest_service_log.pdf",
+        "scenario_filename": "service_log_oct02-04.pdf",
         "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-        "details_to_enter": {}
+        "details_to_enter": {
+          "unresolved_complaints": 0
+        }
       }
     ]
   },
@@ -294,10 +314,14 @@
       },
       {
         "doc_type": "keycard_lock_audit",
-        "generated_file": "evidence/03_keycard_lock_audit.txt",
-        "scenario_filename": null,
+        "generated_file": "evidence/03_keycard_lock_audit.csv",
+        "scenario_filename": "keycard_audit_nair_517.csv",
         "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-        "details_to_enter": {}
+        "details_to_enter": {
+          "entries": 6,
+          "first_entry": "2026-10-18 16:10",
+          "last_entry": "2026-10-20 11:05"
+        }
       },
       {
         "doc_type": "booking_confirmation",
@@ -305,7 +329,8 @@
         "scenario_filename": "bookingcom_confirmation_BDC-4412098.pdf",
         "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
         "details_to_enter": {
-          "recipient": "guest via Booking.com",
+          "recipient": "priya.nair@example.com",
+          "sent_at": "2026-10-02 11:30 UTC",
           "vcc_terms": "Single-use, stay dates only, max $540.00"
         }
       },
@@ -343,10 +368,13 @@
       },
       {
         "doc_type": "booking_confirmation",
-        "generated_file": "evidence/02_booking_confirmation.txt",
-        "scenario_filename": null,
+        "generated_file": "evidence/02_booking_confirmation.eml",
+        "scenario_filename": "confirmation_email_GH-661000.eml",
         "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-        "details_to_enter": {}
+        "details_to_enter": {
+          "recipient": "tomas.herrera@example.com",
+          "sent_at": "2026-09-25 08:45 UTC"
+        }
       },
       {
         "doc_type": "guest_communication_log",
@@ -398,10 +426,14 @@
       },
       {
         "doc_type": "keycard_lock_audit",
-        "generated_file": "evidence/03_keycard_lock_audit.txt",
-        "scenario_filename": null,
+        "generated_file": "evidence/03_keycard_lock_audit.csv",
+        "scenario_filename": "keycard_audit_omalley_629.csv",
         "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-        "details_to_enter": {}
+        "details_to_enter": {
+          "entries": 11,
+          "first_entry": "2026-10-14 15:45",
+          "last_entry": "2026-10-16 10:30"
+        }
       },
       {
         "doc_type": "id_verification_log",

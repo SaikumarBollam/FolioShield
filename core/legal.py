@@ -35,6 +35,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from .audit_logger import AuditLogger
+from ._jsonl import append_jsonl, read_jsonl
 from .models import LegalFilingRecord, WitnessRecord
 from .security import escape_markup as esc
 
@@ -407,27 +408,17 @@ class LegalRegistry:
 
     def _append(self, case_id: str, kind: str, record: Dict[str, Any]) -> None:
         entry = {"kind": kind, "recorded_at": datetime.now(timezone.utc).isoformat(), "record": record}
-        with open(self._path(case_id), "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, default=str) + "\n")
+        append_jsonl(self._path(case_id), entry)
 
-    def load(self, case_id: str) -> Dict[str, List[Dict[str, Any]]]:
-        out: Dict[str, List[Dict[str, Any]]] = {"witnesses": [], "filings": []}
-        path = self._path(case_id)
-        if not os.path.exists(path):
-            return out
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if entry.get("kind") == "witness":
-                    out["witnesses"].append(entry.get("record") or {})
-                elif entry.get("kind") == "legal_filing":
-                    out["filings"].append(entry.get("record") or {})
+    def load(self, case_id: str) -> Dict[str, Any]:
+        out: Dict[str, Any] = {"witnesses": [], "filings": [], "corrupt_lines": []}
+        entries, corrupt = read_jsonl(self._path(case_id))
+        for entry in entries:
+            if entry.get("kind") == "witness":
+                out["witnesses"].append(entry.get("record") or {})
+            elif entry.get("kind") == "legal_filing":
+                out["filings"].append(entry.get("record") or {})
+        out["corrupt_lines"] = corrupt
         return out
 
     def add_witness(self, case_id: str, witness: WitnessRecord) -> WitnessRecord:
