@@ -58,8 +58,12 @@ class ConnectorAgent:
         return set()
 
     def _save_state(self) -> None:
+        # Atomic write (tmp + replace): a crash mid-save must not corrupt
+        # the processed-hash set.
         self._state_path.parent.mkdir(parents=True, exist_ok=True)
-        self._state_path.write_text(json.dumps({"processed_hashes": sorted(self._processed_hashes)}, indent=2), encoding="utf-8")
+        tmp = self._state_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"processed_hashes": sorted(self._processed_hashes)}, indent=2), encoding="utf-8")
+        tmp.replace(self._state_path)
 
     # -------------------------------------------------------------- lifecycle
 
@@ -86,7 +90,14 @@ class ConnectorAgent:
     # -------------------------------------------------------------- collection
 
     def collect_once(self) -> int:
-        """Discover documents from enabled sources and enqueue new jobs."""
+        """Discover documents from enabled sources and enqueue new jobs.
+
+        Per-item isolation: one invalid/unsupported file is logged and
+        skipped — it never aborts discovery for the remaining files or
+        sources. Hashes are NOT marked processed here; that happens only
+        after the upload succeeds (see sync_once), so a lost queue cannot
+        strand a document in a 'done' state.
+        """
         enqueued = 0
         for source in self.config.sources:
             if not source.enabled:
@@ -97,7 +108,12 @@ class ConnectorAgent:
                 sha256 = item.get("sha256") or hashlib.sha256(data).hexdigest()
                 if sha256 in self._processed_hashes:
                     continue
-                validate_upload(data, item["filename"])
+                try:
+                    validate_upload(data, item["filename"],
+                                    max_bytes=self.config.max_upload_mb * 1024 * 1024)
+                except ValueError as exc:
+                    logger.warning("Skipping %s from source %s: %s", item.get("filename"), source.source_id, exc)
+                    continue
                 document_type = item["document_type"]
                 if document_type not in self.config.allowed_document_types:
                     continue
@@ -112,16 +128,23 @@ class ConnectorAgent:
                     "source_id": source.source_id,
                 }
                 self.queue.enqueue("upload_document", payload, idempotency_key=f"doc-{sha256}", max_attempts=self.config.max_attempts)
-                self._processed_hashes.add(sha256)
                 enqueued += 1
-        self._save_state()
         return enqueued
 
     # ---------------------------------------------------------- synchronization
 
     def sync_once(self) -> Dict[str, int]:
-        """Process due queue jobs once. Returns counts by outcome."""
-        outcomes = {"succeeded": 0, "failed": 0, "dead_letter": 0}
+        """Process due queue jobs once. Returns counts by outcome.
+
+        Recovers jobs stuck in 'running' from a previous crash first, and
+        records a document's hash as processed only after its upload has
+        actually succeeded.
+        """
+        recovered = self.queue.recover_stale_running(self.config.running_lease_seconds)
+        if recovered:
+            logger.warning("Recovered %d stale 'running' job(s) after restart", recovered)
+        outcomes = {"succeeded": 0, "failed": 0, "dead_letter": 0, "recovered": recovered}
+        state_changed = False
         for job in self.queue.due_jobs():
             self.queue.mark_running(job["job_id"])
             payload = json.loads(job["payload"])
@@ -129,6 +152,10 @@ class ConnectorAgent:
                 result = self._execute_job(payload)
                 self.queue.mark_succeeded(job["job_id"], result=result)
                 outcomes["succeeded"] += 1
+                sha256 = payload.get("sha256")
+                if sha256 and sha256 not in self._processed_hashes:
+                    self._processed_hashes.add(sha256)
+                    state_changed = True
             except Exception as exc:
                 updated = self.queue.mark_failed(
                     job["job_id"], str(exc), backoff_base=self.config.backoff_base_seconds,
@@ -137,6 +164,8 @@ class ConnectorAgent:
                     outcomes["dead_letter"] += 1
                 else:
                     outcomes["failed"] += 1
+        if state_changed:
+            self._save_state()
         return outcomes
 
     def _execute_job(self, payload: Dict[str, Any]) -> Dict[str, Any]:

@@ -82,6 +82,11 @@ See [API Integration](docs/integrations/api_integration.md) for the endpoint inv
   (`FOLIOSHIELD_EXHIBIT_DIR`, default `data/exhibits`) with atomic,
   hash-verified writes and verified reads — corrupt files are quarantined
   and honestly reported as not retained.
+- The enterprise integration registry (tenants, credentials, agents,
+  webhooks, cases, jobs, deliveries) persists in SQLite at
+  `data/integrations/registry.db` (auto-migrated from the v1 JSON store);
+  webhook signing secrets are encrypted at rest, and failed webhook
+  deliveries retry with resumable backoff.
 
 ---
 

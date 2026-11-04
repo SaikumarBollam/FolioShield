@@ -50,6 +50,7 @@ class TestEnterpriseIntegrations(unittest.TestCase):
             property_ids=["prop-b"])
 
     def tearDown(self):
+        self.registry.close()
         self.tmp.cleanup()
 
     def test_credential_authentication_and_revocation(self):

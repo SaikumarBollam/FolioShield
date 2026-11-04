@@ -7,14 +7,37 @@
 - Credential suspension and revocation.
 - Agent suspension/revocation through registry status and heartbeat failure.
 - Bearer authentication for enterprise integration endpoints.
+- Shared API key for legacy endpoints (`FOLIOSHIELD_API_KEY`), fail-closed in production, with per-client rate limiting.
 - Scope checks per endpoint/service operation.
 - CORS allowlist; wildcard CORS removed from the API handler.
 - JSON body size limit and safe error responses.
 - Request IDs for correlation without logging payloads.
 - PAN masking and prompt-injection sanitization through existing FolioShield security utilities.
-- Upload validation using existing file signature/size checks.
+- Upload validation: extension allowlist, file signature/size checks, and binary-content sniffing for text types.
 - Signed webhooks with timestamp tolerance, event IDs, and idempotency keys.
 - Hash-chained audit logging with optional HMAC via `AUDIT_HMAC_KEY`.
+
+## Phase 2 (P1) data-reliability controls
+
+- **Integration registry storage**: SQLite (WAL) at `data/integrations/registry.db`
+  replaces the v1 `registry.json`. Concurrent processes serialize through
+  database transactions. A legacy `registry.json` is imported once on first
+  open, verified, and renamed to `registry.json.migrated-<timestamp>`; a
+  corrupt legacy file raises an error and is preserved — never silently
+  replaced with an empty registry.
+- **Webhook secrets**: stored Fernet-encrypted (`FOLIOSHIELD_WEBHOOK_SECRET_KEY`,
+  or a generated `webhook_secret.key` beside the registry DB). Plaintext
+  secrets never touch disk; the raw secret is shown once at subscribe time.
+  Deliveries whose secret cannot be decrypted are recorded `undeliverable`,
+  never sent unsigned. Failed deliveries retry with backoff and are resumed
+  by `WebhookManager.resume_due_deliveries()` (API interval thread via
+  `FOLIOSHIELD_WEBHOOK_RESUME_SECONDS`, agent, or cron).
+- **Append-only trails**: submission/escalation/legal registries and the
+  audit logger append via fsynced single-line writes; torn/corrupt lines
+  are reported as `corrupt_lines`, not silently dropped.
+- **Agent queue**: SQLite WAL with stale-`running` job recovery after a
+  crash; a document hash is marked processed only after its upload
+  succeeds; one invalid file never blocks other sources.
 
 ## Production requirements not supplied by the built-in server alone
 

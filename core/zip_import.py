@@ -109,7 +109,9 @@ def plan_zip_import(
     manifest_by_basename = {v.replace("\\", "/").rsplit("/", 1)[-1].lower(): k for k, v in manifest.items()}
 
     total = 0
-    for info in infos:
+    # Deterministic processing order (archive order is filesystem-dependent):
+    # sorted by entry name, so duplicate-slot resolution is reproducible.
+    for info in sorted(infos, key=lambda i: i.filename.lower()):
         name = info.filename
         base = name.replace("\\", "/").rsplit("/", 1)[-1]
         if base.lower() == "manifest.json":
@@ -128,18 +130,50 @@ def plan_zip_import(
             plan["error"] = f"ZIP contents exceed the total limit ({max_total_bytes // 1_048_576} MB uncompressed). Split the archive and retry."
             plan["matched"] = {}
             return plan
-        data = archive.read(info)
+        # Streamed read with a hard cap: a lying size header (decompression
+        # bomb) is stopped at max_file_bytes+1 actual bytes, never fully
+        # materialized beyond the limit.
+        try:
+            chunks: List[bytes] = []
+            read_so_far = 0
+            with archive.open(info) as stream:
+                while True:
+                    chunk = stream.read(256 * 1024)
+                    if not chunk:
+                        break
+                    read_so_far += len(chunk)
+                    if read_so_far > max_file_bytes:
+                        break
+                    chunks.append(chunk)
+        except (RuntimeError, zipfile.BadZipFile) as exc:
+            plan["skipped"].append({"filename": name, "reason": f"could not be extracted ({exc})"})
+            continue
+        if read_so_far > max_file_bytes:
+            plan["skipped"].append({"filename": name, "reason": f"exceeds the per-file limit ({max_file_bytes // 1_048_576} MB) when extracted"})
+            continue
+        data = b"".join(chunks)
         doc_type = manifest_by_basename.get(base.lower()) or match_doc_type(base)
         if doc_type is None:
             plan["unmatched"].append(base)
             continue
-        if doc_type in plan["matched"]:
-            plan["skipped"].append({
-                "filename": name,
-                "reason": f"duplicate for slot '{doc_type}' — '{plan['matched'][doc_type]['filename']}' was kept; attach this one manually if it should replace it",
-            })
-            continue
         via = "manifest" if base.lower() in manifest_by_basename else ("key" if doc_type in base.lower() else "keyword")
+        if doc_type in plan["matched"]:
+            existing = plan["matched"][doc_type]
+            rank = {"manifest": 3, "key": 2, "keyword": 1}
+            if rank[via] > rank[existing["via"]]:
+                # A stronger match (manifest/key) replaces a weaker keyword
+                # match; the replaced file is reported, not silently dropped.
+                plan["skipped"].append({
+                    "filename": existing["filename"],
+                    "reason": f"duplicate for slot '{doc_type}' — replaced by '{base}' (stronger {via} match); attach manually if it should be kept",
+                })
+                plan["matched"][doc_type] = {"filename": base, "data": data, "via": via}
+            else:
+                plan["skipped"].append({
+                    "filename": name,
+                    "reason": f"duplicate for slot '{doc_type}' — '{existing['filename']}' was kept; attach this one manually if it should replace it",
+                })
+            continue
         plan["matched"][doc_type] = {"filename": base, "data": data, "via": via}
 
     plan["ok"] = True

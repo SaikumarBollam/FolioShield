@@ -295,6 +295,10 @@ def _import_evidence_zip() -> None:
         "archive": zip_file.name, "imported": imported, "failed": failed,
         "unmatched": plan.get("unmatched") or [], "skipped": plan.get("skipped") or [],
     }
+    if failed:
+        # Partial failure: allow re-uploading the same archive to retry the
+        # failed files once the underlying problem is fixed.
+        st.session_state.processed_uploads.pop("evidence_zip", None)
     log("evidence_zip_imported", {"archive": zip_file.name, "archive_sha256": zip_digest,
                                   "imported": [{"doc_type": i["doc_type"], "filename": i["filename"], "sha256": i["sha256"]} for i in imported],
                                   "unmatched": plan.get("unmatched") or [],

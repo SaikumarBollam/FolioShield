@@ -32,6 +32,8 @@ class AgentQueue:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.path))
         self._conn.row_factory = sqlite3.Row
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA busy_timeout=5000")
         self._init_schema()
 
     def _init_schema(self) -> None:
@@ -122,6 +124,31 @@ class AgentQueue:
         )
         self._conn.commit()
         return self.get(job_id)
+
+    def recover_stale_running(self, lease_seconds: int = 600) -> int:
+        """Requeues jobs stuck in 'running' after a crash/restart.
+
+        A job is stale when it entered 'running' more than lease_seconds
+        ago (updated_at is set by mark_running). Attempts are preserved so
+        crash-looping jobs still progress toward dead_letter. Returns the
+        number of jobs recovered.
+        """
+        rows = self._conn.execute("SELECT job_id, updated_at FROM jobs WHERE status='running'").fetchall()
+        recovered = 0
+        now = _now()
+        for row in rows:
+            try:
+                started = datetime.fromisoformat(row["updated_at"]).timestamp()
+            except (TypeError, ValueError):
+                started = 0.0
+            if now - started >= lease_seconds:
+                self._conn.execute(
+                    "UPDATE jobs SET status='queued', next_attempt_at=?, last_error=?, updated_at=? WHERE job_id=?",
+                    (now, "Recovered after agent restart (job was stuck in 'running')", _iso(), row["job_id"]),
+                )
+                recovered += 1
+        self._conn.commit()
+        return recovered
 
     def _update(self, job_id: str, status: str) -> None:
         self._conn.execute("UPDATE jobs SET status=?, updated_at=? WHERE job_id=?", (status, _iso(), job_id))

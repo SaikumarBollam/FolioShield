@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional
 from ..client import FolioShield
 from ..extractor import DocumentExtractor
 from ..models import EvidenceItem
-from ..security import validate_upload
+from ..security import sanitize_filename, validate_upload
 from .contracts import DocumentSubmission, IntegrationCaseRef, IntegrationEvent, TenantContext
 from .registry import IntegrationRegistry
 from .webhooks import WebhookManager
@@ -70,7 +70,17 @@ class IntegrationService:
                         filename: str, media_type: str, data: bytes,
                         evidence_doc_type: Optional[str] = None) -> Dict[str, Any]:
         context.require_scope("documents:write")
+        filename = sanitize_filename(filename)
         validate_upload(data, filename, max_bytes=self.engine.settings.max_upload_bytes)
+        # Document-type coherence (Phase 2): fail here with a precise error
+        # instead of deep inside extraction.
+        lower = filename.lower()
+        if document_type == "dispute_notice" and not lower.endswith(".pdf"):
+            raise ValueError("dispute_notice documents must be PDF files.")
+        if document_type == "guest_folio" and not lower.endswith((".pdf", ".csv")):
+            raise ValueError("guest_folio documents must be PDF or CSV files.")
+        if document_type not in ("dispute_notice", "guest_folio", "supporting_evidence"):
+            raise ValueError(f"Unsupported document_type: {document_type}")
         record = self.registry.get_case(context.tenant_id, case_id)
         if not record:
             raise KeyError("Case not found for tenant")

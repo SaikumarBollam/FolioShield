@@ -80,11 +80,17 @@ class TestConnectorAgent(unittest.TestCase):
             fake = FakeCommunication()
             agent = ConnectorAgent(config, communication=fake)  # type: ignore[arg-type]
             self.assertEqual(agent.collect_once(), 2)
-            self.assertEqual(agent.collect_once(), 0)  # hashes already processed
+            # Phase 2: hashes are marked processed only after a successful
+            # upload. A second collect re-discovers the files, but queue
+            # idempotency (doc-<sha256>) prevents duplicate jobs.
+            agent.collect_once()
+            self.assertEqual(agent.queue.counts().get("queued"), 2)
             outcomes = agent.sync_once()
             self.assertEqual(outcomes["succeeded"], 2)
             self.assertEqual({u["document_type"] for u in fake.uploads}, {"dispute_notice", "guest_folio"})
             self.assertEqual(agent.health()["queue"].get("succeeded"), 2)
+            # After success the hashes are processed: nothing re-enqueues.
+            self.assertEqual(agent.collect_once(), 0)
             agent.queue.close()
 
     def test_sync_failure_uses_retry_not_data_loss(self):

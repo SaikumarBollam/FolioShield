@@ -30,6 +30,39 @@ _MAGIC_BYTES = {
     "jpeg": [b"\xff\xd8\xff"],
 }
 
+# Phase 2 (P1): default intake allowlist — every UI/API/agent upload path
+# accepts exactly these types. Anything else (executables, HTML/SVG that
+# could carry stored-XSS, archives) is rejected at intake.
+ALLOWED_UPLOAD_EXTENSIONS = frozenset({"pdf", "png", "jpg", "jpeg", "csv", "eml", "txt"})
+TEXT_UPLOAD_EXTENSIONS = frozenset({"csv", "eml", "txt"})
+_UNSAFE_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f\x7f]')
+
+
+def sanitize_filename(filename: str, fallback: str = "document") -> str:
+    """Normalizes an untrusted filename for storage/display.
+
+    Basename only, unsafe/control characters stripped, length capped.
+    Never raises; returns `fallback` when nothing usable remains.
+    """
+    base = (filename or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
+    base = _UNSAFE_FILENAME_CHARS.sub("_", base).strip(" .")
+    if not base or base in (".", ".."):
+        return fallback
+    return base[:120]
+
+
+def _looks_like_binary(data: bytes) -> bool:
+    """True when 'text' content is actually binary (NULs / undecodable)."""
+    sample = data[:8192]
+    if b"\x00" in sample:
+        return True
+    try:
+        sample.decode("utf-8")
+        return False
+    except UnicodeDecodeError:
+        decoded = sample.decode("utf-8", errors="replace")
+        return decoded.count("\ufffd") > max(4, len(decoded) // 100)
+
 
 def mask_card_number(text: str) -> str:
     """
@@ -110,10 +143,12 @@ def escape_markup(value: Any) -> str:
     return _xml_escape("" if value is None else str(value))
 
 
-def validate_upload(file_bytes: bytes, filename: str, max_bytes: Optional[int] = None) -> None:
+def validate_upload(file_bytes: bytes, filename: str, max_bytes: Optional[int] = None,
+                    allowed_extensions: Optional[frozenset] = None) -> None:
     """
-    Validates an uploaded file's size and (for binary formats) magic-byte signature.
-    Raises ValueError with a user-facing message if the file is rejected.
+    Validates an uploaded file: non-empty, size limit, extension allowlist,
+    magic-byte signature for binary formats, and a binary sniff for text
+    formats. Raises ValueError with a user-facing message on rejection.
     """
     limit = max_bytes if max_bytes is not None else MAX_UPLOAD_BYTES
     if not file_bytes:
@@ -124,6 +159,17 @@ def validate_upload(file_bytes: bytes, filename: str, max_bytes: Optional[int] =
             f"the limit is {limit // 1_048_576} MB."
         )
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    allowed = allowed_extensions if allowed_extensions is not None else ALLOWED_UPLOAD_EXTENSIONS
+    if ext not in allowed:
+        raise ValueError(
+            f"'{filename}': file type '.{ext or '(none)'}' is not accepted. "
+            f"Accepted types: {', '.join(sorted(allowed))}."
+        )
     signatures = _MAGIC_BYTES.get(ext)
     if signatures and not any(file_bytes.startswith(sig) for sig in signatures):
         raise ValueError(f"'{filename}' does not look like a valid .{ext} file.")
+    if ext in TEXT_UPLOAD_EXTENSIONS and _looks_like_binary(file_bytes):
+        raise ValueError(
+            f"'{filename}' is named .{ext} but its contents look binary. "
+            "Export the record as text/CSV/EML, or attach the original in its real format."
+        )

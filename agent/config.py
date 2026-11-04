@@ -45,6 +45,9 @@ class AgentConfig:
     allowed_document_types: List[str] = field(default_factory=lambda: ["dispute_notice", "guest_folio", "supporting_evidence"])
     sources: List[SourceConfig] = field(default_factory=list)
     version: str = "0.1.0"
+    # Phase 2: upload validation limit + stale-running job lease (seconds).
+    max_upload_mb: int = 10
+    running_lease_seconds: int = 600
 
     @property
     def api_key(self) -> str:

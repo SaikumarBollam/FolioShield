@@ -30,6 +30,8 @@ import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+from ._jsonl import append_jsonl, read_jsonl
+
 _SAFE = re.compile(r"[^A-Za-z0-9._-]+")
 
 STAGES = ("chargeback", "submitted", "under_review", "won", "lost",
@@ -239,27 +241,17 @@ class EscalationRegistry:
 
     def _append(self, case_id: str, kind: str, record: Dict[str, Any]) -> None:
         entry = {"kind": kind, "recorded_at": datetime.now(timezone.utc).isoformat(), "record": record}
-        with open(self._path(case_id), "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, default=str) + "\n")
+        append_jsonl(self._path(case_id), entry)
 
-    def load(self, case_id: str) -> Dict[str, List[Dict[str, Any]]]:
-        out: Dict[str, List[Dict[str, Any]]] = {"stage_history": [], "rounds": [], "losses": [], "arbitration": []}
-        path = self._path(case_id)
-        if not os.path.exists(path):
-            return out
+    def load(self, case_id: str) -> Dict[str, Any]:
+        out: Dict[str, Any] = {"stage_history": [], "rounds": [], "losses": [], "arbitration": [], "corrupt_lines": []}
         kind_map = {"stage": "stage_history", "round_snapshot": "rounds", "loss": "losses", "arbitration": "arbitration"}
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                key = kind_map.get(entry.get("kind"))
-                if key:
-                    out[key].append(entry.get("record") or {})
+        entries, corrupt = read_jsonl(self._path(case_id))
+        for entry in entries:
+            key = kind_map.get(entry.get("kind"))
+            if key:
+                out[key].append(entry.get("record") or {})
+        out["corrupt_lines"] = corrupt
         return out
 
     def transition(self, case_id: str, to_stage: str, network: Optional[str] = None,

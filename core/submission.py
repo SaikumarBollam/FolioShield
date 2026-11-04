@@ -28,6 +28,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from .audit_logger import AuditLogger
+from ._jsonl import append_jsonl, read_jsonl
 from .models import OutcomeRecord, SubmissionRecord
 from .portals import get_portal_profile
 
@@ -182,25 +183,21 @@ class SubmissionRegistry:
 
     def _append(self, case_id: str, kind: str, record: Dict[str, Any]) -> None:
         entry = {"kind": kind, "recorded_at": datetime.now(timezone.utc).isoformat(), "record": record}
-        with open(self._path(case_id), "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, default=str) + "\n")
+        append_jsonl(self._path(case_id), entry)
 
-    def load(self, case_id: str) -> Dict[str, List[Dict[str, Any]]]:
-        out: Dict[str, List[Dict[str, Any]]] = {"submissions": [], "outcomes": []}
-        path = self._path(case_id)
-        if not os.path.exists(path):
-            return out
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                key = "submissions" if entry.get("kind") == "submission" else "outcomes"
-                out[key].append(entry.get("record") or {})
+    def load(self, case_id: str) -> Dict[str, Any]:
+        """Returns {submissions, outcomes, corrupt_lines}.
+
+        corrupt_lines lists 1-based line numbers that could not be parsed
+        (e.g. a torn final line after a crash) — reported, never silently
+        dropped (Phase 2).
+        """
+        out: Dict[str, Any] = {"submissions": [], "outcomes": [], "corrupt_lines": []}
+        entries, corrupt = read_jsonl(self._path(case_id))
+        for entry in entries:
+            key = "submissions" if entry.get("kind") == "submission" else "outcomes"
+            out[key].append(entry.get("record") or {})
+        out["corrupt_lines"] = corrupt
         return out
 
     def register_submission(self, record: SubmissionRecord) -> SubmissionRecord:
@@ -241,6 +238,7 @@ class SubmissionRegistry:
                     pass
         return {
             "submissions": submissions, "outcomes": outcomes,
+            "corrupt_lines": data.get("corrupt_lines") or [],
             "latest_submission": latest_sub, "latest_outcome": latest_out,
             "decision_overdue": overdue, "decision_days_left": days_left,
             "status": (latest_out or {}).get("decision") if latest_out else (latest_sub or {}).get("status", "not_submitted"),

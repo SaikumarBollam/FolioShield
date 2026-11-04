@@ -23,6 +23,7 @@ class TestIntegrationManagement(unittest.TestCase):
             self.assertEqual(snap_b["credentials"], 1)
             self.assertEqual(snap_a["cases"], 0)
             self.assertEqual(snap_b["cases"], 0)
+            registry.close()
 
     def test_agent_suspension_blocks_heartbeat(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -33,6 +34,7 @@ class TestIntegrationManagement(unittest.TestCase):
             self.assertIsNotNone(registry.agent_heartbeat("hotel-a", "agent-1"))
             self.assertTrue(registry.set_agent_status("hotel-a", "agent-1", "suspended"))
             self.assertIsNone(registry.agent_heartbeat("hotel-a", "agent-1"))
+            registry.close()
 
 
 if __name__ == "__main__":

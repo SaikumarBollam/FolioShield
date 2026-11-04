@@ -25,6 +25,7 @@ class TestWebhooks(unittest.TestCase):
         self.manager = WebhookManager(self.registry, sender=sender)
 
     def tearDown(self):
+        self.registry.close()
         self.tmp.cleanup()
 
     def test_signed_delivery_and_duplicate_suppression(self):

@@ -23,6 +23,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from .config import config
+from ._jsonl import append_jsonl
 
 logger = logging.getLogger(__name__)
 
@@ -87,10 +88,13 @@ class AuditLogger:
     def _persist_event(self, event: Dict[str, Any]) -> None:
         file_path = os.path.join(self.log_dir, f"audit_trail_{self.session_id}.jsonl")
         try:
-            with open(file_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(event, default=str) + "\n")
+            append_jsonl(file_path, event)
+            self.persist_failures = 0
         except OSError as e:
             # Non-blocking if disk write fails; in-memory trail is still kept.
+            # The failure count is tracked so diagnostics can surface it
+            # instead of the trail silently diverging from disk (Phase 2).
+            self.persist_failures = getattr(self, "persist_failures", 0) + 1
             logger.warning("Could not persist audit event to %s: %s", file_path, e)
 
     # -------------------------------------------------------------- verification

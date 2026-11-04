@@ -539,6 +539,35 @@ class FolioShieldAPIHandler(BaseHTTPRequestHandler):
         logger.debug("%s - %s", self.address_string(), format % args)
 
 
+def _start_webhook_resume_thread() -> None:
+    """Periodically resumes due webhook deliveries (opt-in).
+
+    Enabled when FOLIOSHIELD_WEBHOOK_RESUME_SECONDS > 0. Deliveries are
+    tenant data; the loop uses the same registry/service stack as the API.
+    """
+    try:
+        interval = int(os.getenv("FOLIOSHIELD_WEBHOOK_RESUME_SECONDS", "0"))
+    except ValueError:
+        interval = 0
+    if interval <= 0:
+        return
+
+    def _loop() -> None:
+        while True:
+            time.sleep(interval)
+            try:
+                registry = IntegrationRegistry(root=INTEGRATION_ROOT)
+                resumed = WebhookManager(registry).resume_due_deliveries()
+                if resumed:
+                    logger.info("Resumed %d webhook deliverie(s)", len(resumed))
+                registry.close()
+            except Exception:
+                logger.exception("Webhook resume cycle failed")
+
+    threading.Thread(target=_loop, name="webhook-resume", daemon=True).start()
+    logger.info("Webhook delivery resume enabled (every %ds)", interval)
+
+
 def run_api_server(port: int = 8000, host: Optional[str] = None):
     """Starts the FolioShield REST API server.
 
@@ -558,6 +587,7 @@ def run_api_server(port: int = 8000, host: Optional[str] = None):
             "Set FOLIOSHIELD_API_KEY before exposing this server beyond localhost.")
     server_address = (host, port)
     httpd = ThreadingHTTPServer(server_address, FolioShieldAPIHandler)
+    _start_webhook_resume_thread()
     print(f"FolioShield REST API listening on http://{host}:{port}")
     try:
         httpd.serve_forever()
