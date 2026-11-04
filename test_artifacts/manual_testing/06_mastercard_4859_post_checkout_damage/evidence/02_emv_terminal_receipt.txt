@@ -1,0 +1,17 @@
+Emv Terminal Receipt
+====================
+SYNTHETIC TEST EVIDENCE — generated for FolioShield manual testing.
+
+Hotel: Grand Horizon Resort & Suites
+Guest: Grace O'Malley
+Case ID: MC-CLM-51208-D
+Folio: FOL-2026-7020
+Confirmation: GH-702000
+Room: 629
+Stay: 2026-10-14 to 2026-10-16
+Document type: emv_terminal_receipt
+Source: Test fixture
+Verified by: Test fixture
+
+Details:
+- Present in scenario; no additional structured details supplied.

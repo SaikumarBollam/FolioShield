@@ -254,6 +254,24 @@ class TestPhase1Collection(unittest.TestCase):
         self.assertIn("MID-884120937", full_text)
         self.assertIn("onity_lock_audit_room412.csv", full_text)
 
+    def test_17_search_helper_tolerates_unset_capture_group(self):
+        """Regression: optional/blank regex groups must not crash folio parsing."""
+        from core.extractor import _search
+
+        self.assertIsNone(_search(r"Check-in Time\s*:?\s*(\d{1,2}:\d{2})?", "Check-in Time:"))
+        folio = DocumentExtractor.parse_folio_pdf(
+            "GRAND HORIZON RESORT & SUITES\n"
+            "Guest Name: Test Guest\n"
+            "Folio Number: FOL-TEST-1\n"
+            "Check-in Time:\n"
+            "Arrival Date: 10/10/2026\n"
+            "Departure Date: 10/11/2026\n"
+            "Total Charges: $100.00\n"
+            "Total Payments: $100.00\n"
+        )
+        self.assertIsNone(folio["check_in_time"])
+        self.assertEqual(folio["total_charges"], 100.0)
+
     def test_16_models_roundtrip_new_fields(self):
         """NoticeData/FolioData/EvidenceItem round-trip the Phase 1 fields."""
         notice = NoticeData.from_dict(SCENARIOS["ota_virtual_card_10_4"]["notice"])

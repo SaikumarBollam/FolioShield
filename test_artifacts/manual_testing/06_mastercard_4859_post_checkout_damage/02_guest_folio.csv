@@ -1,0 +1,7 @@
+Date,Description,Charge,Credit,Reference,Category
+2026-10-14,Room Accommodation - King,290.0,0.0,RM629,Room
+2026-10-15,Room Accommodation - King,290.0,0.0,RM629,Room
+2026-10-16,Occupancy & Resort Tax,100.0,0.0,TAX-OCC,Tax
+2026-10-18,Smoking Damage Remediation Fee,300.0,0.0,INC-2214,Damage
+2026-10-16,Mastercard Settlement (Auth: MC90210),0.0,680.0,AUTH-MC90210,Payment
+2026-10-18,Mastercard Addendum (Auth: MC90277),0.0,300.0,AUTH-MC90277,Payment

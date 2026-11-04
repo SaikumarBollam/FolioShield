@@ -1,0 +1,235 @@
+{
+  "scenario_key": "amex_partial_c08",
+  "title": "Scenario 3: American Express C08 \u2014 Partial Dispute (Incidentals Contest)",
+  "description": "Cardholder acknowledges $850.00 lodging charges but contests $245.00 for dining and valet incidentals. Reconciler detects partial chargeback and highlights signed restaurant slips.",
+  "notice": {
+    "case_id": "AX-DISP-11928-C",
+    "card_network": "American Express",
+    "reason_code": "C08",
+    "reason_description": "Goods / Services Not Received or Partially Received",
+    "disputed_amount": 245.0,
+    "original_amount": 1095.0,
+    "currency": "USD",
+    "transaction_date": "2026-10-02",
+    "dispute_date": "2026-10-20",
+    "response_deadline": "2026-11-04",
+    "cardholder_name": "Marcus Aurelius Sterling",
+    "card_last_4": "1008",
+    "arn": "37102948291048201948201",
+    "claim_statement": "I did not order or consume the restaurant dining room service billed to my folio.",
+    "dispute_stage": "chargeback",
+    "merchant_id": "MID-884120937",
+    "raw_text": "AMERICAN EXPRESS CHARGEBACK RECORD\nDispute Case: AX-DISP-11928-C\nCardmember: Marcus Aurelius Sterling\nAccount: *******1008\nDispute Reason: C08\nDisputed Amount: $245.00 USD\nOriginal Charge: $1,095.00 USD\nCardmember Remarks: 'I did not order or consume the restaurant dining room service billed to my folio.'"
+  },
+  "folio": {
+    "hotel_name": "Grand Horizon Resort & Suites",
+    "hotel_address": "100 Ocean Avenue, Miami Beach, FL 33139",
+    "guest_name": "Marcus Aurelius Sterling",
+    "folio_number": "FOL-2026-5542",
+    "room_number": "Penthouse 12",
+    "check_in": "2026-10-02",
+    "check_out": "2026-10-04",
+    "rate_per_night": 425.0,
+    "total_charges": 1095.0,
+    "total_payments": 1095.0,
+    "balance": 0.0,
+    "card_last_4": "1008",
+    "auth_code": "AX99214",
+    "merchant_id": "MID-884120937",
+    "confirmation_number": "GH-554200",
+    "booking_channel": "direct_phone",
+    "booking_source": "Reservations Desk",
+    "stay_status": "occupied",
+    "line_items": [
+      {
+        "date": "2026-10-02",
+        "description": "Penthouse Suite Accommodations",
+        "amount": 425.0,
+        "type": "Charge",
+        "reference": "RM-PH12",
+        "category": "Room",
+        "disputed": false
+      },
+      {
+        "date": "2026-10-03",
+        "description": "Penthouse Suite Accommodations",
+        "amount": 425.0,
+        "type": "Charge",
+        "reference": "RM-PH12",
+        "category": "Room",
+        "disputed": false
+      },
+      {
+        "date": "2026-10-03",
+        "description": "Private Cabana Dining (Signed Slip #4102)",
+        "amount": 185.0,
+        "type": "Charge",
+        "reference": "POS-4102",
+        "category": "Dining",
+        "disputed": true
+      },
+      {
+        "date": "2026-10-03",
+        "description": "Overnight Valet Parking",
+        "amount": 60.0,
+        "type": "Charge",
+        "reference": "VAL-778",
+        "category": "Valet",
+        "disputed": true
+      },
+      {
+        "date": "2026-10-04",
+        "description": "Amex Settlement (Auth: AX99214)",
+        "amount": 1095.0,
+        "type": "Credit",
+        "reference": "AUTH-AX99214",
+        "category": "Payment",
+        "disputed": null
+      }
+    ],
+    "raw_text": "Folio FOL-2026-5542 Marcus Sterling. Disputed incidental: $185 dining + $60 valet = $245.00."
+  },
+  "supporting_docs": {
+    "signed_registration_card": {
+      "present": true,
+      "filename": "reg_card_sterling_PH12.pdf",
+      "sha256": "5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b",
+      "source": "Front desk scan",
+      "verified_by": "Night Auditor"
+    },
+    "emv_terminal_receipt": true,
+    "avs_cvv_result": true,
+    "cancellation_policy_acceptance": true,
+    "keycard_lock_audit": {
+      "present": true,
+      "filename": "saflok_audit_PH12.csv",
+      "sha256": "6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c",
+      "source": "Saflok lock export",
+      "verified_by": "Night Auditor",
+      "details": {
+        "entries": 9,
+        "first_entry": "2026-10-02 16:05",
+        "last_entry": "2026-10-04 11:12"
+      }
+    },
+    "id_verification_log": true,
+    "booking_confirmation": true,
+    "pos_signed_slips": {
+      "present": true,
+      "filename": "pos_slips_4102_778.pdf",
+      "sha256": "7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d",
+      "source": "Cabana POS + valet desk",
+      "verified_by": "Night Auditor",
+      "details": {
+        "slips": [
+          {
+            "reference": "POS-4102",
+            "amount": 185.0
+          },
+          {
+            "reference": "VAL-778",
+            "amount": 60.0
+          }
+        ]
+      }
+    },
+    "guest_service_log": true
+  },
+  "generated_evidence": [
+    {
+      "doc_type": "signed_registration_card",
+      "generated_file": "evidence/01_signed_registration_card.pdf",
+      "scenario_filename": "reg_card_sterling_PH12.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "emv_terminal_receipt",
+      "generated_file": "evidence/02_emv_terminal_receipt.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "avs_cvv_result",
+      "generated_file": "evidence/03_avs_cvv_result.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "cancellation_policy_acceptance",
+      "generated_file": "evidence/04_cancellation_policy_acceptance.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "keycard_lock_audit",
+      "generated_file": "evidence/05_keycard_lock_audit.csv",
+      "scenario_filename": "saflok_audit_PH12.csv",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "entries": 9,
+        "first_entry": "2026-10-02 16:05",
+        "last_entry": "2026-10-04 11:12"
+      }
+    },
+    {
+      "doc_type": "id_verification_log",
+      "generated_file": "evidence/06_id_verification_log.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "booking_confirmation",
+      "generated_file": "evidence/07_booking_confirmation.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "pos_signed_slips",
+      "generated_file": "evidence/08_pos_signed_slips.pdf",
+      "scenario_filename": "pos_slips_4102_778.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "slips": [
+          {
+            "reference": "POS-4102",
+            "amount": 185.0
+          },
+          {
+            "reference": "VAL-778",
+            "amount": 60.0
+          }
+        ]
+      }
+    },
+    {
+      "doc_type": "guest_service_log",
+      "generated_file": "evidence/09_guest_service_log.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    }
+  ],
+  "guide": {
+    "folder": "03_amex_c08_partial_incidentals",
+    "purpose": "Partial dispute where exact-amount signed POS slips decide the contested lines.",
+    "steps": [
+      "Upload the Amex notice and folio.",
+      "Confirm disputed lines are Dining $185.00 (POS-4102) and Valet $60.00 (VAL-778).",
+      "Upload pos_signed_slips.pdf; in Probative details, first test only POS-4102/$185.00 and observe partial coverage.",
+      "Then use the generated scenario data or add the second slip reference/amount through the SDK/test data; the supplied evidence text lists both slips.",
+      "Draft, approve, compile, choose Stripe, and build the bundle."
+    ],
+    "expected": [
+      "Partial dispute is $245.00 of $1,095.00; $850.00 is uncontested.",
+      "Disputed-scope proof passes when both marked lines total $245.00.",
+      "POS requirement is dispositive and names any uncovered incidental.",
+      "Exhibit D should identify slip POS-4102 $185.00 and VAL-778 $60.00 in the built-in scenario."
+    ]
+  }
+}

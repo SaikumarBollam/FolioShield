@@ -1,0 +1,352 @@
+{
+  "scenario_key": "visa_fraud_10_4",
+  "title": "Scenario 1: Visa 10.4 \u2014 False Fraud Claim (Occupied Deluxe Stay)",
+  "description": "Cardholder claims $1,280.50 transaction was unauthorized card-not-present fraud. Merchant has signed check-in agreement, EMV chip authorization, and room keycard audit trail.",
+  "notice": {
+    "case_id": "V-DISP-89214-X",
+    "card_network": "Visa",
+    "reason_code": "10.4",
+    "reason_description": "Other Fraud: Card-Absent Environment",
+    "disputed_amount": 1280.5,
+    "original_amount": 1280.5,
+    "currency": "USD",
+    "transaction_date": "2026-10-10",
+    "dispute_date": "2026-10-24",
+    "response_deadline": "2026-11-07",
+    "cardholder_name": "Jonathan C. Davis",
+    "card_last_4": "4821",
+    "arn": "24492156291002918274019",
+    "claim_statement": "I did not authorize or participate in this lodging transaction.",
+    "dispute_stage": "chargeback",
+    "processor": "Chase Paymentech",
+    "statement_descriptor": "GRAND HORIZON RESORT MIAMI",
+    "merchant_id": "MID-884120937",
+    "raw_text": "VISA CHARGEBACK DISPUTE NOTIFICATION\nAcquirer Reference Number: 24492156291002918274019\nCase Number: V-DISP-89214-X\nDispute Date: 10/24/2026\nResponse Due Date: 11/07/2026\nCardholder Name: Jonathan C. Davis\nAccount Number: ************4821\nDispute Reason Code: 10.4\nDispute Reason: Other Fraud - Card-Absent Environment\nTransaction Date: 10/10/2026\nDisputed Amount: $1,280.50 USD\nCardholder Statement: 'I did not authorize or participate in this lodging transaction.'"
+  },
+  "folio": {
+    "hotel_name": "Grand Horizon Resort & Suites",
+    "hotel_address": "100 Ocean Avenue, Miami Beach, FL 33139",
+    "guest_name": "Jonathan C. Davis",
+    "folio_number": "FOL-2026-9812",
+    "room_number": "412",
+    "check_in": "2026-10-10",
+    "check_out": "2026-10-13",
+    "rate_per_night": 320.0,
+    "total_charges": 1280.5,
+    "total_payments": 1280.5,
+    "balance": 0.0,
+    "card_last_4": "4821",
+    "auth_code": "AP98231",
+    "merchant_id": "MID-884120937",
+    "confirmation_number": "GH-884120",
+    "booking_channel": "direct_web",
+    "booking_source": "Hotel Website",
+    "booking_date": "2026-09-28",
+    "stay_status": "occupied",
+    "check_in_time": "3:15 PM",
+    "rate_plan": "Best Available Rate",
+    "guest_email": "jonathan.davis@example.com",
+    "avs_result": "Y - full match",
+    "cvv_result": "Match",
+    "entry_mode": "chip",
+    "line_items": [
+      {
+        "date": "2026-10-10",
+        "description": "Room Accommodation - Deluxe King",
+        "amount": 320.0,
+        "type": "Charge",
+        "reference": "RM412",
+        "category": "Room",
+        "disputed": null
+      },
+      {
+        "date": "2026-10-10",
+        "description": "Occupancy & Resort Tax (14.5%)",
+        "amount": 46.4,
+        "type": "Charge",
+        "reference": "TAX-OCC",
+        "category": "Tax",
+        "disputed": null
+      },
+      {
+        "date": "2026-10-10",
+        "description": "Resort Amenity Fee",
+        "amount": 40.0,
+        "type": "Charge",
+        "reference": "RES-FEE",
+        "category": "Resort Fee",
+        "disputed": null
+      },
+      {
+        "date": "2026-10-11",
+        "description": "Room Accommodation - Deluxe King",
+        "amount": 320.0,
+        "type": "Charge",
+        "reference": "RM412",
+        "category": "Room",
+        "disputed": null
+      },
+      {
+        "date": "2026-10-11",
+        "description": "Occupancy & Resort Tax (14.5%)",
+        "amount": 46.4,
+        "type": "Charge",
+        "reference": "TAX-OCC",
+        "category": "Tax",
+        "disputed": null
+      },
+      {
+        "date": "2026-10-11",
+        "description": "Ocean Grill Dining (Signed Room Charge)",
+        "amount": 87.7,
+        "type": "Charge",
+        "reference": "POS-9812",
+        "category": "Dining",
+        "disputed": null
+      },
+      {
+        "date": "2026-10-12",
+        "description": "Room Accommodation - Deluxe King",
+        "amount": 320.0,
+        "type": "Charge",
+        "reference": "RM412",
+        "category": "Room",
+        "disputed": null
+      },
+      {
+        "date": "2026-10-12",
+        "description": "Occupancy & Resort Tax (14.5%)",
+        "amount": 46.4,
+        "type": "Charge",
+        "reference": "TAX-OCC",
+        "category": "Tax",
+        "disputed": null
+      },
+      {
+        "date": "2026-10-12",
+        "description": "Spa Cabana Refreshments",
+        "amount": 53.6,
+        "type": "Charge",
+        "reference": "SPA-331",
+        "category": "Spa",
+        "disputed": null
+      },
+      {
+        "date": "2026-10-13",
+        "description": "Visa Payment (Auth: AP98231)",
+        "amount": 1280.5,
+        "type": "Credit",
+        "reference": "AUTH-AP98231",
+        "category": "Payment",
+        "disputed": null
+      }
+    ],
+    "raw_text": "Grand Horizon Resort Folio FOL-2026-9812 Room 412 Guest: Jonathan C. Davis. Total $1,280.50 Paid."
+  },
+  "supporting_docs": {
+    "signed_registration_card": {
+      "present": true,
+      "filename": "reg_card_davis_412.pdf",
+      "sha256": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4",
+      "source": "Front desk scan",
+      "verified_by": "A. Rivera",
+      "details": {
+        "signature_type": "wet"
+      }
+    },
+    "emv_terminal_receipt": {
+      "present": true,
+      "filename": "emv_receipt_AP98231.pdf",
+      "sha256": "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5",
+      "source": "Ingenico terminal T-04",
+      "verified_by": "A. Rivera"
+    },
+    "avs_cvv_result": {
+      "present": true,
+      "filename": "gateway_auth_log.csv",
+      "sha256": "c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6",
+      "source": "Payment gateway",
+      "verified_by": "A. Rivera",
+      "details": {
+        "avs_result": "Y",
+        "cvv_result": "Match"
+      }
+    },
+    "cancellation_policy_acceptance": {
+      "present": true,
+      "filename": "booking_acceptance_GH-884120.pdf",
+      "sha256": "d4e5f6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8",
+      "source": "Hotel website booking engine",
+      "verified_by": "A. Rivera",
+      "details": {
+        "accepted_at": "2026-09-28 14:01 UTC",
+        "policy_text": "Free cancellation until 48 hours before arrival; thereafter first night + tax."
+      }
+    },
+    "keycard_lock_audit": {
+      "present": true,
+      "filename": "onity_lock_audit_room412.csv",
+      "sha256": "e5f6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4",
+      "source": "Onity lock export",
+      "verified_by": "A. Rivera",
+      "details": {
+        "entries": 14,
+        "first_entry": "2026-10-10 15:22",
+        "last_entry": "2026-10-13 10:48"
+      }
+    },
+    "id_verification_log": {
+      "present": true,
+      "filename": "id_verification_log.pdf",
+      "sha256": "f6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7",
+      "source": "Front desk ID log",
+      "verified_by": "A. Rivera",
+      "details": {
+        "id_type": "Driver license"
+      }
+    },
+    "booking_confirmation": {
+      "present": true,
+      "filename": "confirmation_email_GH-884120.eml",
+      "sha256": "a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4",
+      "source": "PMS confirmation",
+      "verified_by": "A. Rivera",
+      "details": {
+        "recipient": "jonathan.davis@example.com",
+        "sent_at": "2026-09-28 14:02 UTC"
+      }
+    },
+    "guest_service_log": {
+      "present": true,
+      "filename": "service_log_oct10-13.pdf",
+      "sha256": "b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4",
+      "source": "OPERA service log",
+      "verified_by": "A. Rivera",
+      "details": {
+        "unresolved_complaints": 0
+      }
+    },
+    "pos_signed_slips": {
+      "present": true,
+      "filename": "pos_slip_9812.pdf",
+      "sha256": "c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4",
+      "source": "Ocean Grill POS",
+      "verified_by": "A. Rivera"
+    },
+    "wifi_usage_log": {
+      "present": true,
+      "filename": "wifi_log_room412.csv",
+      "sha256": "d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5",
+      "source": "Guest WiFi portal",
+      "verified_by": "A. Rivera"
+    }
+  },
+  "generated_evidence": [
+    {
+      "doc_type": "signed_registration_card",
+      "generated_file": "evidence/01_signed_registration_card.pdf",
+      "scenario_filename": "reg_card_davis_412.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "signature_type": "wet"
+      }
+    },
+    {
+      "doc_type": "emv_terminal_receipt",
+      "generated_file": "evidence/02_emv_terminal_receipt.pdf",
+      "scenario_filename": "emv_receipt_AP98231.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "avs_cvv_result",
+      "generated_file": "evidence/03_avs_cvv_result.csv",
+      "scenario_filename": "gateway_auth_log.csv",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "avs_result": "Y",
+        "cvv_result": "Match"
+      }
+    },
+    {
+      "doc_type": "cancellation_policy_acceptance",
+      "generated_file": "evidence/04_cancellation_policy_acceptance.pdf",
+      "scenario_filename": "booking_acceptance_GH-884120.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "accepted_at": "2026-09-28 14:01 UTC",
+        "policy_text": "Free cancellation until 48 hours before arrival; thereafter first night + tax."
+      }
+    },
+    {
+      "doc_type": "keycard_lock_audit",
+      "generated_file": "evidence/05_keycard_lock_audit.csv",
+      "scenario_filename": "onity_lock_audit_room412.csv",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "entries": 14,
+        "first_entry": "2026-10-10 15:22",
+        "last_entry": "2026-10-13 10:48"
+      }
+    },
+    {
+      "doc_type": "id_verification_log",
+      "generated_file": "evidence/06_id_verification_log.pdf",
+      "scenario_filename": "id_verification_log.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "id_type": "Driver license"
+      }
+    },
+    {
+      "doc_type": "booking_confirmation",
+      "generated_file": "evidence/07_booking_confirmation.eml",
+      "scenario_filename": "confirmation_email_GH-884120.eml",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "recipient": "jonathan.davis@example.com",
+        "sent_at": "2026-09-28 14:02 UTC"
+      }
+    },
+    {
+      "doc_type": "guest_service_log",
+      "generated_file": "evidence/08_guest_service_log.pdf",
+      "scenario_filename": "service_log_oct10-13.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "unresolved_complaints": 0
+      }
+    },
+    {
+      "doc_type": "pos_signed_slips",
+      "generated_file": "evidence/09_pos_signed_slips.pdf",
+      "scenario_filename": "pos_slip_9812.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "wifi_usage_log",
+      "generated_file": "evidence/10_wifi_usage_log.csv",
+      "scenario_filename": "wifi_log_room412.csv",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    }
+  ],
+  "guide": {
+    "folder": "01_visa_10_4_false_fraud",
+    "purpose": "Full occupied-stay fraud defense with a complete physical-presence chain.",
+    "steps": [
+      "Use Custom Document Upload, then upload 01_bank_dispute_notice.pdf and either folio PDF or CSV.",
+      "Open Review & Correct Collected Fields and verify claim statement, 23-digit ARN, MID, AVS, guest email, and check-in time.",
+      "In Tab 2, confirm the mathematical proofs and upload the files from evidence/ into their matching evidence slots.",
+      "For POS Signed Slips, save slip reference POS-9812 and amount 87.70 in Probative details.",
+      "Draft and approve the rebuttal, compile the packet, choose Chase, build the submission bundle, and download it."
+    ],
+    "expected": [
+      "Completeness should be strong (scenario benchmark: 96%).",
+      "Folio footing, amount, settlement, card, name, and rate proofs should pass.",
+      "Chronology should include 3:15 PM check-in and 15:22 first keycard entry.",
+      "Packet remains exactly 3 pages and the ZIP contains the packet, exhibits, manifest, and instructions."
+    ]
+  }
+}

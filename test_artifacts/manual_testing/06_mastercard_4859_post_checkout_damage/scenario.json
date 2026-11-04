@@ -1,0 +1,201 @@
+{
+  "scenario_key": "mc_damage_4859",
+  "title": "Scenario 6: Mastercard 4859 \u2014 Post-Checkout Damage Addendum",
+  "description": "Guest completed a stay, then disputed a $300.00 post-checkout smoking/damage charge billed two days after departure. Defense rests on the signed registration damage clause, photos, and the incident report.",
+  "notice": {
+    "case_id": "MC-CLM-51208-D",
+    "card_network": "Mastercard",
+    "reason_code": "4859",
+    "reason_description": "No-Show / Addendum Dispute",
+    "disputed_amount": 300.0,
+    "original_amount": 980.0,
+    "currency": "USD",
+    "transaction_date": "2026-10-16",
+    "dispute_date": "2026-10-28",
+    "response_deadline": "2026-11-12",
+    "cardholder_name": "Grace O'Malley",
+    "card_last_4": "6640",
+    "arn": "55102948291048201666401",
+    "claim_statement": "I never authorized a $300 charge after I checked out.",
+    "dispute_stage": "chargeback",
+    "merchant_id": "MID-884120937",
+    "raw_text": "MASTERCARD DISPUTE RECORD\nCase Number: MC-CLM-51208-D\nDispute Reason Code: 4859\nCardholder: Grace O'Malley\nAccount: ************6640\nDisputed Amount: $300.00\nCardholder Statement: 'I never authorized a $300 charge after I checked out.'"
+  },
+  "folio": {
+    "hotel_name": "Grand Horizon Resort & Suites",
+    "hotel_address": "100 Ocean Avenue, Miami Beach, FL 33139",
+    "guest_name": "Grace O'Malley",
+    "folio_number": "FOL-2026-7020",
+    "room_number": "629",
+    "check_in": "2026-10-14",
+    "check_out": "2026-10-16",
+    "rate_per_night": 290.0,
+    "total_charges": 980.0,
+    "total_payments": 980.0,
+    "balance": 0.0,
+    "card_last_4": "6640",
+    "auth_code": "MC90210",
+    "merchant_id": "MID-884120937",
+    "confirmation_number": "GH-702000",
+    "booking_channel": "direct_web",
+    "booking_source": "Hotel Website",
+    "stay_status": "occupied",
+    "entry_mode": "chip",
+    "line_items": [
+      {
+        "date": "2026-10-14",
+        "description": "Room Accommodation - King",
+        "amount": 290.0,
+        "type": "Charge",
+        "reference": "RM629",
+        "category": "Room",
+        "disputed": false
+      },
+      {
+        "date": "2026-10-15",
+        "description": "Room Accommodation - King",
+        "amount": 290.0,
+        "type": "Charge",
+        "reference": "RM629",
+        "category": "Room",
+        "disputed": false
+      },
+      {
+        "date": "2026-10-16",
+        "description": "Occupancy & Resort Tax",
+        "amount": 100.0,
+        "type": "Charge",
+        "reference": "TAX-OCC",
+        "category": "Tax",
+        "disputed": false
+      },
+      {
+        "date": "2026-10-18",
+        "description": "Smoking Damage Remediation Fee",
+        "amount": 300.0,
+        "type": "Charge",
+        "reference": "INC-2214",
+        "category": "Damage",
+        "disputed": true
+      },
+      {
+        "date": "2026-10-16",
+        "description": "Mastercard Settlement (Auth: MC90210)",
+        "amount": 680.0,
+        "type": "Credit",
+        "reference": "AUTH-MC90210",
+        "category": "Payment",
+        "disputed": null
+      },
+      {
+        "date": "2026-10-18",
+        "description": "Mastercard Addendum (Auth: MC90277)",
+        "amount": 300.0,
+        "type": "Credit",
+        "reference": "AUTH-MC90277",
+        "category": "Payment",
+        "disputed": null
+      }
+    ],
+    "raw_text": "Folio FOL-2026-7020 Grace O'Malley room 629. Post-checkout smoking damage fee INC-2214 billed 2026-10-18."
+  },
+  "supporting_docs": {
+    "signed_registration_card": {
+      "present": true,
+      "filename": "reg_card_omalley_629.pdf",
+      "sha256": "3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",
+      "source": "Front desk scan",
+      "verified_by": "Front Office Manager",
+      "details": {
+        "damage_clause_signed": true
+      }
+    },
+    "emv_terminal_receipt": true,
+    "keycard_lock_audit": true,
+    "id_verification_log": true,
+    "incident_damage_evidence": {
+      "present": true,
+      "filename": "incident_INC-2214_photos_report.pdf",
+      "sha256": "4b5c6d7e8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a",
+      "source": "Housekeeping incident report",
+      "verified_by": "Front Office Manager",
+      "details": {
+        "photos": 6,
+        "report_id": "INC-2214"
+      }
+    },
+    "guest_communication_log": {
+      "present": true,
+      "filename": "guest_comms_omalley.pdf",
+      "sha256": "5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a",
+      "source": "Front desk email",
+      "verified_by": "Front Office Manager"
+    }
+  },
+  "generated_evidence": [
+    {
+      "doc_type": "signed_registration_card",
+      "generated_file": "evidence/01_signed_registration_card.pdf",
+      "scenario_filename": "reg_card_omalley_629.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "damage_clause_signed": true
+      }
+    },
+    {
+      "doc_type": "emv_terminal_receipt",
+      "generated_file": "evidence/02_emv_terminal_receipt.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "keycard_lock_audit",
+      "generated_file": "evidence/03_keycard_lock_audit.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "id_verification_log",
+      "generated_file": "evidence/04_id_verification_log.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "incident_damage_evidence",
+      "generated_file": "evidence/05_incident_damage_evidence.pdf",
+      "scenario_filename": "incident_INC-2214_photos_report.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "photos": 6,
+        "report_id": "INC-2214"
+      }
+    },
+    {
+      "doc_type": "guest_communication_log",
+      "generated_file": "evidence/06_guest_communication_log.pdf",
+      "scenario_filename": "guest_comms_omalley.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    }
+  ],
+  "guide": {
+    "folder": "06_mastercard_4859_post_checkout_damage",
+    "purpose": "Post-checkout smoking-damage addendum tied to the signed registration clause.",
+    "steps": [
+      "Upload the Mastercard 4859 notice and folio.",
+      "Confirm only the $300.00 Smoking Damage Remediation Fee is disputed; room/tax lines are undisputed.",
+      "Upload registration, terminal, keycard, ID, incident evidence, and communications files.",
+      "For incident evidence, note report INC-2214 and six photos in the evidence details/notes if testing the UI fields.",
+      "Draft, approve, compile, and review chronology for the October 18 addendum."
+    ],
+    "expected": [
+      "Partial/addendum scope totals $300.00.",
+      "Transaction date is treated as post-checkout addendum, not automatically the wrong folio.",
+      "Incident/damage evidence is dispositive and Exhibit labeling references INC-2214.",
+      "The rebuttal ties the charge to the signed registration damage clause."
+    ]
+  }
+}

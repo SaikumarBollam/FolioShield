@@ -1035,6 +1035,23 @@ with tab_pdf:
                 st.warning("Stay data changed since the last compile — recompile to download.")
             st.button("📥 Download Ready After Compilation", disabled=True, width="stretch")
 
+    if pdf_current:
+        st.markdown("#### 👁️ Preview Bank Dispute Packet")
+        st.caption("Preview the exact compiled 3-page PDF before downloading or building the submission bundle. Use the PDF viewer's page controls to inspect pages 1–3.")
+        preview_col, preview_meta = st.columns([3, 1])
+        with preview_meta:
+            pdf_hash = AuditLogger.calculate_sha256(st.session_state.generated_pdf or b"")
+            st.metric("Packet Size", f"{len(st.session_state.generated_pdf or b'') / 1024:.1f} KB")
+            st.metric("Packet SHA-256", f"{pdf_hash[:12]}…")
+            st.caption("If the preview does not load in your browser, use the Download button above to open the same PDF locally.")
+        with preview_col:
+            try:
+                st.pdf(st.session_state.generated_pdf, height=900)
+            except Exception as preview_error:
+                st.warning(f"Inline PDF preview is unavailable in this browser/session: {preview_error}. Download the PDF above to view the identical file.")
+                log("pdf_preview_failed", {"case_id": notice_data.get("case_id"), "error": str(preview_error),
+                                           "message": "Inline packet preview failed; download fallback shown"})
+
     # --- Phase 6: Submission bundle ------------------------------------------
     st.markdown("---")
     st.markdown("#### 📦 Submission Bundle (Packet + Exhibits)")

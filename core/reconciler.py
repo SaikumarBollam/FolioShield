@@ -257,10 +257,13 @@ class Reconciler:
         header_charges = _money(folio.get("total_charges"))
         header_payments = _money(folio.get("total_payments"))
         item_charges = round(sum(_money(i.get("amount")) for i in line_items if i.get("type") == "Charge"), 2)
-        item_credits = round(sum(_money(i.get("amount")) for i in line_items if i.get("type") == "Credit"), 2)
         refund_lines = [i for i in line_items if i.get("type") == "Credit"
-                        and (i.get("category") == "Refund" or re.search(r"refund", str(i.get("description") or ""), re.I))]
+                        and (i.get("category") == "Refund" or re.search(r"\brefund(?:ed|s|ing)?\b", str(i.get("description") or ""), re.I))]
         refund_from_items = round(sum(_money(i.get("amount")) for i in refund_lines), 2)
+        # Refund credits are tracked separately from settlement payments:
+        # a folio can be settled ($0 balance) and then refunded.
+        item_credits = round(sum(_money(i.get("amount")) for i in line_items
+                                 if i.get("type") == "Credit" and i not in refund_lines), 2)
 
         has_items = bool(line_items)
         has_headers = header_charges > 0 or header_payments > 0

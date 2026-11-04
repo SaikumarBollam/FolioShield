@@ -80,8 +80,22 @@ def _to_amount(raw: Any) -> float:
 
 
 def _search(pattern: str, text: str, flags: int = re.I | re.M) -> Optional[str]:
+    """Return regex group 1, or None when there is no match/group value.
+
+    Some folio layouts make a capture group optional in practice (for
+    example, a label is present but its value is blank or split by PDF text
+    extraction). Never let that turn into AttributeError during upload.
+    """
+    if not text:
+        return None
     m = re.search(pattern, text, flags)
-    return m.group(1).strip() if m else None
+    if not m:
+        return None
+    try:
+        value = m.group(1)
+    except (IndexError, AttributeError):
+        return None
+    return value.strip() if isinstance(value, str) and value.strip() else None
 
 
 def _find_last4(text: str) -> Optional[str]:
@@ -376,7 +390,7 @@ class DocumentExtractor:
         folio["room_number"] = _search(r'\b(?:Room\s*(?:Number|No\.?|#)|Rm\.?)\s*:?\s*([A-Z]?\d{1,5}[A-Z]?)\b', text)
         folio["check_in"] = _search(r'\b(?:Arrival(?:\s*Date)?|Check-?\s?in(?:\s*Date)?)\s*:?\s*' + _DATE, text)
         folio["check_out"] = _search(r'\b(?:Departure(?:\s*Date)?|Check-?\s?out(?:\s*Date)?)\s*:?\s*' + _DATE, text)
-        folio["check_in_time"] = _search(r'\b(?:Arrival|Check-?\s?in)\s*(?:Time)?\s*:?\s*' + _DATE + r'?\s*' + _TIME, text) or _search(r'\bCheck-?\s?in\s*Time\s*:?\s*' + _TIME, text)
+        folio["check_in_time"] = _search(r'\bCheck-?\s?in\s*Time\s*:?\s*' + _TIME, text)
         folio["check_out_time"] = _search(r'\bCheck-?\s?out\s*Time\s*:?\s*' + _TIME, text)
         folio["card_last_4"] = _find_last4(text)
         folio["auth_code"] = _search(r'\b(?:Auth(?:orization)?(?:\s*Code)?|Appr(?:oval)?(?:\s*Code)?)\s*[:#]?\s*([A-Z0-9]*\d[A-Z0-9]*)\b', text)
@@ -434,7 +448,7 @@ class DocumentExtractor:
             if any(skip in desc.lower() for skip in ("total", "balance", "subtotal")):
                 continue
             amount = _to_amount(m_item.group(3).replace("-", ""))
-            is_credit = "-" in m_item.group(3) or re.search(r'payment|credit|settlement|refund', desc, re.I)
+            is_credit = "-" in m_item.group(3) or re.search(r'payment|credit|settlement|\brefund(?:ed|s|ing)?\b', desc, re.I) and not re.search(r'non-refundable', desc, re.I)
             item_type = "Credit" if is_credit else "Charge"
             # Preserve a trailing voucher/reference token (e.g. "POS-9812", "#4102").
             ref_match = re.search(r'\b(?:Ref\.?|Voucher|Slip|Check|Auth)[:#]?\s*([A-Z0-9][A-Z0-9\-]{2,})\s*$', desc, re.I) or re.search(r'\(([A-Z0-9\-]{3,})\)\s*$', desc)
@@ -480,8 +494,17 @@ class DocumentExtractor:
         except (pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeDecodeError) as e:
             raise ExtractionError(f"Could not parse CSV folio: {e}") from e
 
-        # Normalize column headers (first matching column wins for each canonical name)
+        # Normalize column headers. Exact canonical names win before keyword
+        # matching so a "Credit" column cannot be shadowed by another header.
         col_map: Dict[str, str] = {}
+        exact = {"date": "date", "description": "description", "desc": "description",
+                 "credit": "credit", "payment": "credit", "charge": "amount",
+                 "amount": "amount", "debit": "amount", "reference": "reference",
+                 "category": "category"}
+        for col in df.columns:
+            canonical = exact.get(str(col).strip().lower())
+            if canonical and canonical not in col_map.values():
+                col_map[col] = canonical
         rules = [
             ("date", ("date",)),
             ("description", ("desc", "item", "particular")),
@@ -491,6 +514,8 @@ class DocumentExtractor:
             ("category", ("category", "dept", "department")),
         ]
         for col in df.columns:
+            if col in col_map:
+                continue
             clean = str(col).strip().lower()
             for canonical, keywords in rules:
                 if canonical not in col_map.values() and any(k in clean for k in keywords):
@@ -514,10 +539,13 @@ class DocumentExtractor:
             if reference and reference.lower() in ("nan", "none", "0", "0.0"):
                 reference = None
 
-            is_credit = credit_val > 0 or charge_val < 0 or bool(re.search(r'payment|credit|settlement|refund', desc, re.I))
+            is_credit_desc = bool(re.search(r'payment|credit|settlement|\brefund(?:ed|s|ing)?\b', desc, re.I)) and not bool(re.search(r'non-refundable', desc, re.I))
+            is_credit = credit_val > 0 or charge_val < 0 or is_credit_desc
+            is_refund = bool(re.search(r'\brefund(?:ed|s|ing)?\b', desc, re.I)) and not bool(re.search(r'non-refundable', desc, re.I))
             if is_credit:
                 amt = credit_val if credit_val > 0 else abs(charge_val)
-                total_payments += amt
+                if not is_refund:
+                    total_payments += amt
             else:
                 amt = charge_val
                 total_charges += amt

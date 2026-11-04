@@ -36,6 +36,7 @@ logs/*.jsonl
 *.pdf
 !samples/*.pdf
 !FolioShield*workflow*.pdf
+!test_artifacts/manual_testing/**/*.pdf
 
 # Runtime case data (submissions, exhibits, custody records)
 data/submissions/

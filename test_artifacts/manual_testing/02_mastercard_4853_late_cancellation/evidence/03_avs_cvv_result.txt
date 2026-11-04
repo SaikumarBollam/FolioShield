@@ -1,0 +1,17 @@
+Avs Cvv Result
+==============
+SYNTHETIC TEST EVIDENCE — generated for FolioShield manual testing.
+
+Hotel: Grand Horizon Resort & Suites
+Guest: Eleanor Vance
+Case ID: MC-CLM-44019-B
+Folio: RES-2026-7731
+Confirmation: GH-773100
+Room: 308 (Reserved)
+Stay: 2026-09-28 to 2026-09-30
+Document type: avs_cvv_result
+Source: Test fixture
+Verified by: Test fixture
+
+Details:
+- Present in scenario; no additional structured details supplied.
