@@ -407,13 +407,14 @@ except Exception as embedded_error:
     st.error(f"Embedded session rejected: {embedded_error}")
     log("embedded_session_rejected", {"error": str(embedded_error), "message": "Embedded context validation failed"})
 
-tab_ingest, tab_audit, tab_rebuttal, tab_pdf, tab_legal, tab_logs = st.tabs([
+tab_ingest, tab_audit, tab_rebuttal, tab_pdf, tab_legal, tab_integrations, tab_logs = st.tabs([
     "📄 1. Upload Notice & Guest Folio",
     "🔍 2. Stay & Billing Verification",
     "✍️ 3. Dispute Response Letter",
     "📑 4. Generate Bank Evidence Packet",
     "⚖️ 5. Court / Legal Track",
-    "🔒 6. Staff Activity & History",
+    "🔌 6. Integration Management",
+    "🔒 7. Staff Activity & History",
 ])
 
 
@@ -1539,7 +1540,192 @@ with tab_legal:
 
 
 # -----------------------------------------------------------------------------
-# TAB 6: STAFF ACTIVITY & HISTORY
+# TAB 6: INTEGRATION MANAGEMENT (Enterprise Expansion Phase 5)
+# -----------------------------------------------------------------------------
+with tab_integrations:
+    st.subheader("Integration Management")
+    st.markdown(
+        "Manage tenant API credentials, on-premises connector agents, webhooks, embedded configuration, "
+        "and integration health. These controls manage integrations only; dispute processing still uses the "
+        "existing FolioShield engine and human approval remains explicit."
+    )
+    st.warning("🔐 Management actions are recorded in the audit log. Raw API secrets are shown once at issuance — store them in your credential manager.")
+
+    from core.integrations.registry import IntegrationRegistry
+    from core.integrations.webhooks import WebhookManager
+
+    integration_root = os.getenv("FOLIOSHIELD_INTEGRATION_ROOT", "data/integrations")
+    integration_registry = IntegrationRegistry(root=integration_root)
+    webhook_manager = WebhookManager(integration_registry)
+
+    mgmt_tenant = st.text_input("Tenant ID to manage:", value=st.session_state.get("mgmt_tenant", ""), key="mgmt_tenant",
+                                placeholder="e.g. grand-horizon")
+    mgmt_confirmed = st.checkbox("I am authorized to manage integrations for this tenant", key="mgmt_confirmed")
+    tenant_record = integration_registry.get_tenant(mgmt_tenant) if mgmt_tenant else None
+
+    if mgmt_tenant and not tenant_record:
+        st.info("Tenant not found. Create it below to begin enrollment.")
+        with st.form("create_tenant"):
+            tenant_name = st.text_input("Tenant / hotel group name:")
+            tenant_props = st.text_input("Property IDs (comma-separated):", value="")
+            if st.form_submit_button("Create Tenant"):
+                if not mgmt_confirmed:
+                    st.error("Confirm tenant management authorization first.")
+                elif tenant_name.strip():
+                    created = integration_registry.create_tenant(
+                        mgmt_tenant, tenant_name.strip(),
+                        property_ids=[p.strip() for p in tenant_props.split(",") if p.strip()])
+                    log("integration_tenant_created", {"tenant_id": created["tenant_id"], "message": "Integration tenant created"})
+                    st.success(f"Tenant created: {created['tenant_id']}")
+                    st.rerun()
+
+    if tenant_record and mgmt_confirmed:
+        snapshot = integration_registry.monitoring_snapshot(mgmt_tenant)
+        im1, im2, im3, im4 = st.columns(4)
+        with im1:
+            st.metric("Agents", f"{snapshot['agents']['active']}/{snapshot['agents']['total']} active")
+        with im2:
+            st.metric("Cases", snapshot["cases"])
+        with im3:
+            st.metric("Failed Jobs", snapshot["jobs"]["failed"])
+        with im4:
+            st.metric("Webhook Failures", snapshot["webhook_deliveries"]["failed"])
+
+        st.markdown("#### 🔑 API Credentials")
+        credentials = integration_registry.list_credentials(mgmt_tenant)
+        if credentials:
+            st.dataframe(pd.DataFrame(credentials), width="stretch", hide_index=True)
+        with st.form("issue_credential"):
+            cred_label = st.text_input("Credential label:", value="PMS integration")
+            cred_scopes = st.multiselect(
+                "Scopes:",
+                ["cases:read", "cases:write", "cases:process", "documents:write", "packets:generate", "audit:read", "webhooks:manage", "agent:sync"],
+                default=["cases:read", "cases:write", "cases:process", "documents:write"])
+            if st.form_submit_button("Issue API Credential"):
+                public, raw_secret = integration_registry.issue_credential(mgmt_tenant, cred_label, cred_scopes)
+                st.session_state.last_issued_secret = raw_secret
+                st.session_state.last_issued_credential = public["credential_id"]
+                log("integration_credential_issued", {"tenant_id": mgmt_tenant, "credential_id": public["credential_id"],
+                                                      "message": "Integration API credential issued"})
+                st.rerun()
+        if st.session_state.get("last_issued_secret"):
+            st.error("Copy this secret now. It will not be shown again.")
+            st.code(st.session_state.last_issued_secret)
+            if st.button("I have stored the secret"):
+                st.session_state.last_issued_secret = ""
+                st.rerun()
+        if credentials:
+            revoke_id = st.selectbox("Credential to revoke/suspend:", [c["credential_id"] for c in credentials], key="revoke_cred_id")
+            rc1, rc2 = st.columns(2)
+            with rc1:
+                if st.button("Suspend Credential"):
+                    integration_registry.suspend_credential(mgmt_tenant, revoke_id)
+                    log("integration_credential_suspended", {"tenant_id": mgmt_tenant, "credential_id": revoke_id, "message": "Credential suspended"})
+                    st.rerun()
+            with rc2:
+                if st.button("Revoke Credential", type="primary"):
+                    integration_registry.revoke_credential(mgmt_tenant, revoke_id)
+                    log("integration_credential_revoked", {"tenant_id": mgmt_tenant, "credential_id": revoke_id, "message": "Credential revoked"})
+                    st.rerun()
+
+        st.markdown("#### 🖥️ Connector Agents")
+        agents = integration_registry.list_agents(mgmt_tenant)
+        if agents:
+            st.dataframe(pd.DataFrame(agents), width="stretch", hide_index=True)
+        with st.form("register_agent"):
+            agent_id = st.text_input("Agent ID:", value="front-office-agent-1")
+            agent_name = st.text_input("Agent name:", value="Front Office Connector")
+            agent_version = st.text_input("Agent version:", value="0.1.0")
+            if st.form_submit_button("Register Agent & Issue Agent Credential"):
+                agent, raw_secret = integration_registry.register_agent(mgmt_tenant, agent_id, agent_name, version=agent_version)
+                st.session_state.last_agent_secret = raw_secret
+                log("integration_agent_registered", {"tenant_id": mgmt_tenant, "agent_id": agent_id,
+                                                     "message": "Connector agent registered"})
+                st.rerun()
+        if st.session_state.get("last_agent_secret"):
+            st.error("Copy this agent secret now. Configure it through the agent credential file or environment variable.")
+            st.code(st.session_state.last_agent_secret)
+            if st.button("I have stored the agent secret"):
+                st.session_state.last_agent_secret = ""
+                st.rerun()
+        if agents:
+            selected_agent = st.selectbox("Agent to suspend/revoke:", [a["agent_id"] for a in agents], key="selected_agent")
+            ac1, ac2 = st.columns(2)
+            with ac1:
+                if st.button("Suspend Agent"):
+                    integration_registry.set_agent_status(mgmt_tenant, selected_agent, "suspended")
+                    log("integration_agent_suspended", {"tenant_id": mgmt_tenant, "agent_id": selected_agent, "message": "Agent suspended"})
+                    st.rerun()
+            with ac2:
+                if st.button("Revoke Agent", type="primary"):
+                    integration_registry.set_agent_status(mgmt_tenant, selected_agent, "revoked")
+                    log("integration_agent_revoked", {"tenant_id": mgmt_tenant, "agent_id": selected_agent, "message": "Agent revoked"})
+                    st.rerun()
+
+        st.markdown("#### 🔔 Webhooks")
+        subscriptions = webhook_manager.list_subscriptions(mgmt_tenant)
+        if subscriptions:
+            st.dataframe(pd.DataFrame(subscriptions), width="stretch", hide_index=True)
+        with st.form("create_webhook"):
+            hook_url = st.text_input("Webhook HTTPS URL:")
+            hook_events = st.multiselect("Events:", ["dispute.received", "document.processed", "reconciliation.completed",
+                                                     "evidence.missing_identified", "rebuttal.drafted", "approval.recorded",
+                                                     "packet.generated", "processing.failed"], default=["rebuttal.drafted", "packet.generated"])
+            if st.form_submit_button("Create Webhook Subscription"):
+                try:
+                    sub = webhook_manager.subscribe(mgmt_tenant, hook_url, hook_events)
+                except ValueError as exc:
+                    st.error(str(exc))
+                else:
+                    st.session_state.last_webhook_secret = sub["secret_shown_once"]
+                    log("integration_webhook_created", {"tenant_id": mgmt_tenant, "subscription_id": sub["subscription_id"],
+                                                        "message": "Webhook subscription created"})
+                    st.rerun()
+        if st.session_state.get("last_webhook_secret"):
+            st.error("Copy this webhook signing secret now. It will not be shown again.")
+            st.code(st.session_state.last_webhook_secret)
+            if st.button("I have stored the webhook secret"):
+                st.session_state.last_webhook_secret = ""
+                st.rerun()
+        deliveries = webhook_manager.list_deliveries(mgmt_tenant)
+        if deliveries:
+            st.markdown("**Recent webhook deliveries**")
+            st.dataframe(pd.DataFrame(deliveries[-20:]), width="stretch", hide_index=True)
+
+        st.markdown("#### 🔗 Embedded Configuration")
+        from embedded.configuration import EmbeddedConfiguration
+        embedded_cfg = EmbeddedConfiguration.from_env()
+        st.json({
+            "enabled": embedded_cfg.enabled,
+            "default_view": embedded_cfg.default_view,
+            "allowed_origins": embedded_cfg.allowed_origins,
+            "frame_ancestors": embedded_cfg.frame_ancestors(),
+            "content_security_policy": embedded_cfg.content_security_policy(),
+            "oidc_status": "Requires identity-provider validation (not production-verified)",
+        })
+
+        st.markdown("#### 🩺 Diagnostics")
+        diagnostics = {
+            "tenant": tenant_record,
+            "monitoring": snapshot,
+            "integration_root": integration_root,
+            "api_note": "Built-in API server is for development/controlled testing; production requires TLS termination and network controls.",
+            "agent_sql_status": "SQL connectors require vendor validation; filesystem and generic REST connectors are implemented.",
+        }
+        st.download_button(
+            "⬇️ Download redacted integration diagnostics (JSON)",
+            data=json.dumps(diagnostics, indent=2, default=str),
+            file_name=f"integration_diagnostics_{mgmt_tenant}.json",
+            mime="application/json",
+            on_click=lambda: log("integration_diagnostics_exported", {"tenant_id": mgmt_tenant,
+                                                                      "message": "Redacted integration diagnostics exported"}),
+        )
+    elif mgmt_tenant and tenant_record and not mgmt_confirmed:
+        st.warning("Confirm tenant management authorization to reveal integration controls.")
+
+
+# -----------------------------------------------------------------------------
+# TAB 7: STAFF ACTIVITY & HISTORY
 # -----------------------------------------------------------------------------
 with tab_logs:
     st.subheader("Staff Activity Log & Chain of Custody")
