@@ -72,8 +72,34 @@ class EmbeddedConfiguration:
     @classmethod
     def from_env(cls) -> "EmbeddedConfiguration":
         origins = [o.strip() for o in os.getenv("FOLIOSHIELD_EMBEDDED_ALLOWED_ORIGINS", "").split(",") if o.strip()]
+        branding = {}
+        # Server-side default host theme (used when the signed context
+        # carries no theme). Hosts may override per-session via the token.
+        for env_key, theme_key in (
+            ("FOLIOSHIELD_THEME_PRIMARY_COLOR", "primary_color"),
+            ("FOLIOSHIELD_THEME_ACCENT_COLOR", "accent_color"),
+            ("FOLIOSHIELD_THEME_BACKGROUND_COLOR", "background_color"),
+            ("FOLIOSHIELD_THEME_TEXT_COLOR", "text_color"),
+            ("FOLIOSHIELD_THEME_FONT_FAMILY", "font_family"),
+            ("FOLIOSHIELD_THEME_BRAND_NAME", "brand_name"),
+            ("FOLIOSHIELD_THEME_LOGO_URL", "logo_url"),
+        ):
+            value = os.getenv(env_key, "").strip()
+            if value:
+                branding[theme_key] = value
         return cls(
             enabled=os.getenv("FOLIOSHIELD_EMBEDDED_ENABLED", "false").lower() in ("1", "true", "yes"),
             allowed_origins=origins,
             default_view=os.getenv("FOLIOSHIELD_EMBEDDED_DEFAULT_VIEW", "dashboard"),
+            branding=branding,
         )
+
+    def resolve_theme(self, context_theme: Optional[Dict[str, str]] = None):
+        """Theme precedence: signed host context > server env defaults > FolioShield default."""
+        from .theme import HostTheme
+
+        merged: Dict[str, str] = {}
+        merged.update(self.branding or {})
+        if context_theme:
+            merged.update({k: v for k, v in context_theme.items() if v})
+        return HostTheme.from_dict(merged)

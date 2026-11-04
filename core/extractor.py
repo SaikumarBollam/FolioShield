@@ -180,6 +180,68 @@ class DocumentExtractor:
     """
 
     @staticmethod
+    def pdf_first_page_to_image(file_bytes: bytes, zoom: float = 2.0) -> bytes:
+        """
+        Renders the first page of a PDF to PNG bytes for vision analysis.
+
+        Uses pypdfium2 (installed with the `streamlit[pdf]` extra), falling
+        back to PyMuPDF when available. Raises ExtractionError with install
+        guidance when no renderer is available or the PDF has no pages —
+        it never fabricates an image.
+        """
+        try:
+            import pypdfium2 as pdfium
+        except ImportError:
+            pdfium = None
+        if pdfium is not None:
+            try:
+                doc = pdfium.PdfDocument(file_bytes)
+                try:
+                    if len(doc) == 0:
+                        raise ExtractionError("The uploaded PDF has no pages to analyze.")
+                    page = doc[0]
+                    try:
+                        bitmap = page.render(scale=zoom)
+                        try:
+                            image = bitmap.to_pil()
+                        finally:
+                            bitmap.close()
+                    finally:
+                        page.close()
+                finally:
+                    doc.close()
+                import io
+
+                buffer = io.BytesIO()
+                image.save(buffer, format="PNG")
+                return buffer.getvalue()
+            except ExtractionError:
+                raise
+            except Exception as exc:
+                raise ExtractionError(
+                    f"Could not render the PDF first page for vision analysis: {exc}"
+                ) from exc
+        try:
+            import fitz  # PyMuPDF
+        except ImportError as exc:
+            raise ExtractionError(
+                "PDF vision preview requires a PDF renderer. Install it with: "
+                'pip install "streamlit[pdf]" (or pip install PyMuPDF), then retry. '
+                "Image uploads (PNG/JPG) work without it."
+            ) from exc
+        try:
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            if doc.page_count == 0:
+                raise ExtractionError("The uploaded PDF has no pages to analyze.")
+            page = doc.load_page(0)
+            pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
+            return pix.tobytes("png")
+        except ExtractionError:
+            raise
+        except Exception as exc:
+            raise ExtractionError(f"Could not render the PDF first page for vision analysis: {exc}") from exc
+
+    @staticmethod
     def extract_text_from_pdf(file_bytes: bytes) -> str:
         """
         Extracts text from a PDF (pdfplumber first, pypdf as fallback).

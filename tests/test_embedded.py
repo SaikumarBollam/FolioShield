@@ -53,6 +53,51 @@ class TestEmbeddedIntegration(unittest.TestCase):
         self.assertIn("frame-ancestors https://host.example", config.content_security_policy())
         self.assertIn("object-src 'none'", config.content_security_policy())
 
+    def test_host_theme_validation_and_fallback(self):
+        from embedded.theme import DEFAULT_THEME, HostTheme
+
+        default = HostTheme.from_dict(None)
+        self.assertEqual(default.primary_color, DEFAULT_THEME["primary_color"])
+        self.assertEqual(default.brand_name, "FolioShield")
+
+        themed = HostTheme.from_dict({
+            "primary_color": "#7C3AED", "accent_color": "#06B6D4",
+            "brand_name": "Azure Palms Hotels", "logo_url": "https://cdn.example.com/logo.png",
+            "font_family": "Georgia, serif", "border_radius": "10px",
+        })
+        self.assertEqual(themed.primary_color, "#7C3AED")
+        self.assertEqual(themed.brand_name, "Azure Palms Hotels")
+        self.assertIn("--fs-primary: #7C3AED", themed.css())
+
+        # Invalid / dangerous values fall back to defaults, never into CSS.
+        hostile = HostTheme.from_dict({
+            "primary_color": "red; } body { display:none",
+            "font_family": "x; } <script>alert(1)</script>",
+            "logo_url": "javascript:alert(1)",
+            "brand_name": "A" * 200,
+        })
+        self.assertEqual(hostile.primary_color, DEFAULT_THEME["primary_color"])
+        self.assertEqual(hostile.font_family, DEFAULT_THEME["font_family"])
+        self.assertEqual(hostile.logo_url, "")
+        self.assertNotIn("<script>", hostile.css())
+        self.assertNotIn("javascript:", hostile.css())
+
+    def test_theme_precedence_context_over_env_over_default(self):
+        config = EmbeddedConfiguration(enabled=True, branding={"primary_color": "#111111", "brand_name": "Env Brand"})
+        env_theme = config.resolve_theme()
+        self.assertEqual(env_theme.primary_color, "#111111")
+        ctx_theme = config.resolve_theme({"primary_color": "#222222"})
+        self.assertEqual(ctx_theme.primary_color, "#222222")
+        self.assertEqual(ctx_theme.brand_name, "Env Brand")  # env fills gaps
+
+    def test_theme_travels_inside_signed_context(self):
+        ctx = EmbeddedContext(tenant_id="hotel-a", user_id="u-1",
+                              theme={"primary_color": "#0F766E", "brand_name": "Host Brand"})
+        token = create_context_token(ctx, self.secret)
+        validated = validate_context_token(token, self.secret)
+        self.assertEqual(validated.theme["primary_color"], "#0F766E")
+        self.assertEqual(validated.theme["brand_name"], "Host Brand")
+
 
 if __name__ == "__main__":
     unittest.main()

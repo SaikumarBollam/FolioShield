@@ -1,8 +1,15 @@
 """
-Three-Page PDF Dispute Evidence Packet Generator for FolioShield.
+PDF Dispute Evidence Packet Generator for FolioShield.
 Built with ReportLab. Every value in the packet comes from the extracted documents, the reconciliation
 result, or the reviewer — the generator never fabricates logs, timestamps, policies, or signatures.
-Each page's content is wrapped in a shrink-to-fit frame so the packet is always exactly three pages.
+
+Packet formats:
+  * executive (default): exactly three pages — cover/rebuttal, folio audit,
+    evidence annex/custody. Each page is shrink-to-fit.
+  * complete: the same three pages plus an exhibit appendix. Satisfied
+    exhibits are appended after page 3; image exhibits render inline, text/CSV
+    exhibits render as readable content, and PDF exhibits receive a labeled
+    appendix page (their bytes remain available in the submission bundle).
 """
 
 import io
@@ -14,6 +21,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.pdfgen import canvas
+from reportlab.platypus import Image as RLImage
 from reportlab.platypus import KeepInFrame, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from .audit_logger import AuditLogger
@@ -104,7 +112,8 @@ def _fit_page(flowables: List[Any]) -> KeepInFrame:
 
 class EvidencePacketGenerator:
     """
-    Compiles a 3-page dispute rebuttal packet.
+    Compiles a dispute rebuttal packet in executive (3-page) or complete
+    (3 pages + exhibit appendix) format.
     """
 
     @staticmethod
@@ -149,6 +158,68 @@ class EvidencePacketGenerator:
         return out or [Paragraph("[No rebuttal text provided]", s["rebuttal"])]
 
     @classmethod
+    def _appendix_flowables(
+        cls,
+        reconciliation: Dict[str, Any],
+        exhibit_files: Optional[Dict[str, bytes]],
+        s: Dict[str, ParagraphStyle],
+    ) -> List[Any]:
+        """Appendix pages for the complete packet format (one section per exhibit)."""
+        body = s["body"]
+        out: List[Any] = []
+        exhibits = reconciliation.get("exhibits") or []
+        if not exhibits:
+            return out
+        evidence_by_type = {i.get("doc_type"): i for i in (reconciliation.get("evidence_items") or [])}
+        out.append(PageBreak())
+        out.append(Paragraph("<b>EXHIBIT APPENDIX</b>", s["title"]))
+        out.append(Paragraph(
+            "The following appendix reproduces or identifies the exhibits cited in the rebuttal. "
+            "Image and text exhibits are reproduced below. PDF exhibits are identified by file name and SHA-256; "
+            "their original bytes accompany this packet in the submission bundle and retain the same exhibit letter.",
+            s["subtitle"]))
+        for exhibit in exhibits:
+            letter = exhibit.get("letter") or "?"
+            item = evidence_by_type.get(exhibit.get("doc_type")) or {}
+            filename = exhibit.get("filename") or item.get("filename") or "file not retained"
+            sha256 = exhibit.get("sha256") or item.get("sha256") or ""
+            data = (exhibit_files or {}).get(letter)
+            out.append(Paragraph(f"<b>EXHIBIT {esc(letter)} — {esc(exhibit.get('label') or 'Evidence')}</b>", s["section"]))
+            out.append(Paragraph(
+                f"File: {esc(filename)}"
+                + (f" · SHA-256 <font face='Courier'>{esc(str(sha256)[:24])}…</font>" if sha256 else "")
+                + (f" · {len(data):,} bytes retained" if data else " · file bytes not retained in this session"),
+                body))
+            out.append(Spacer(1, 4))
+            lower_name = str(filename).lower()
+            if data and lower_name.endswith((".png", ".jpg", ".jpeg")):
+                try:
+                    image = RLImage(io.BytesIO(data))
+                    image._restrictSize(CONTENT_W, CONTENT_H * 0.72)
+                    image.hAlign = "CENTER"
+                    out.append(image)
+                except Exception:
+                    out.append(_box(Paragraph("Image exhibit could not be rendered inline. Refer to the retained exhibit file in the submission bundle.", body), "#FEF2F2", RED))
+            elif data and lower_name.endswith((".txt", ".csv", ".eml")):
+                try:
+                    text = data.decode("utf-8", errors="replace")[:12000]
+                    rendered = "<br/>".join(esc(line) for line in text.splitlines()[:220])
+                    out.append(_box(Paragraph(rendered or "[Empty exhibit file]", body), "#F8FAFC", "#94A3B8", 0.5))
+                except Exception:
+                    out.append(_box(Paragraph("Text exhibit could not be rendered inline. Refer to the retained exhibit file in the submission bundle.", body), "#FEF2F2", RED))
+            elif data and lower_name.endswith(".pdf"):
+                out.append(_box(Paragraph(
+                    "This exhibit is a PDF document. Its original bytes accompany this packet in the submission bundle "
+                    f"under the same Exhibit {esc(letter)} designation and SHA-256 shown above. Review the retained PDF file for its full content.",
+                    body), "#FFFBEB", AMBER))
+            else:
+                out.append(_box(Paragraph(
+                    "Exhibit identified by the evidence index. Attach or retain the original file under the same exhibit letter before submission.",
+                    body), "#F8FAFC", "#94A3B8", 0.5))
+            out.append(Spacer(1, 10))
+        return out
+
+    @classmethod
     def generate_packet(
         cls,
         notice: Dict[str, Any],
@@ -162,6 +233,8 @@ class EvidencePacketGenerator:
         approval_fingerprint: Optional[str] = None,
         chain_head: Optional[Dict[str, Any]] = None,
         packet_sha256: Optional[str] = None,
+        packet_format: str = "executive",
+        exhibit_files: Optional[Dict[str, bytes]] = None,
     ) -> bytes:
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
@@ -436,5 +509,7 @@ class EvidencePacketGenerator:
         page3.append(_box(Paragraph(custody_lines, body), "#F1F5F9", "#475569", 1))
 
         story = [_fit_page(page1), PageBreak(), _fit_page(page2), PageBreak(), _fit_page(page3)]
+        if str(packet_format or "executive").lower() == "complete":
+            story += cls._appendix_flowables(reconciliation, exhibit_files, s)
         doc.build(story, canvasmaker=NumberedCanvas)
         return buffer.getvalue()

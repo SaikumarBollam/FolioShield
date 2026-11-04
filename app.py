@@ -1,6 +1,5 @@
 """
-FolioShield: Autonomous Chargeback Defense & Evidence Builder
-Meta Llama Hackathon Submission — Track: Build for Your World
+FolioShield: Hotel Chargeback Defense & Evidence Management
 
 Workflow: Upload → Extract → (Vision/OCR) → Review fields → Collect evidence files
           → Reconcile → Draft (Llama 3.3 70B / template) → Submission gate
@@ -32,6 +31,7 @@ from core.pdf_generator import EvidencePacketGenerator
 from core.reconciler import Reconciler
 from core.rules import SUPPORTING_DOC_GROUPS, SUPPORTING_DOC_GUIDANCE, SUPPORTING_DOC_TYPES
 from core.security import validate_upload
+from core.zip_import import plan_zip_import
 from core.config import config
 from data.sample_scenarios import SCENARIOS
 
@@ -41,25 +41,41 @@ logging.basicConfig(level=config.log_level, format="%(asctime)s %(levelname)s %(
 DEFAULT_MERCHANT = config.merchant_name
 CARD_NETWORKS = ["Visa", "Mastercard", "American Express", "Discover"]
 PROVIDER_OPTIONS = {
-    "Offline / Template Mode": OFFLINE_PROVIDER,
+    "Local Processing (No External AI)": OFFLINE_PROVIDER,
     "Groq": "groq",
     "Together AI": "together",
     "OpenRouter": "openrouter",
 }
 SCENARIO_OPTIONS = {
-    "visa_fraud_10_4": "Visa 10.4: False Fraud Claim ($1,280.50)",
-    "mc_cancellation_4853": "Mastercard 4853: Late Cancel ($690.00)",
-    "amex_partial_c08": "Amex C08: Partial Incidental ($245.00)",
-    "ota_virtual_card_10_4": "Visa 10.4: OTA Virtual Card — Booking.com ($540.00)",
-    "visa_refund_issued_13_6": "Visa 13.6: Refund Already Issued ($412.00)",
-    "mc_damage_4859": "Mastercard 4859: Post-Checkout Damage ($300.00)",
-    "custom": "📂 Custom Document Upload",
+    "visa_fraud_10_4": "Visa 10.4 — Unauthorized Transaction Claim",
+    "mc_cancellation_4853": "Mastercard 4853 — Cancellation Dispute",
+    "amex_partial_c08": "American Express C08 — Partial Charge Dispute",
+    "ota_virtual_card_10_4": "Visa 10.4 — OTA Virtual Card",
+    "visa_refund_issued_13_6": "Visa 13.6 — Refund Already Issued",
+    "mc_damage_4859": "Mastercard 4859 — Post-Checkout Charge",
+    "custom": "📂 New Dispute Case",
 }
 DEFAULT_SCENARIO = "visa_fraud_10_4" if config.enable_test_scenarios else "custom"
 VISION_DOC_TYPES = [
     "Registration Card", "Government Photo ID", "POS Signed Slip",
     "Terminal Receipt", "Booking Confirmation", "Other Supporting Document",
 ]
+
+
+def _infer_vision_doc_type(filename: str) -> str:
+    """Best-effort document-type guess from a filename; staff can override per file."""
+    name = (filename or "").lower()
+    if "registration" in name:
+        return "Registration Card"
+    if "passport" in name or "photo_id" in name or "_id" in name or name.startswith("id"):
+        return "Government Photo ID"
+    if "pos" in name or "slip" in name:
+        return "POS Signed Slip"
+    if "emv" in name or "terminal" in name or "receipt" in name:
+        return "Terminal Receipt"
+    if "booking" in name or "confirmation" in name:
+        return "Booking Confirmation"
+    return "Other Supporting Document"
 BOOKING_CHANNELS = ["", "direct_web", "direct_phone", "ota", "gds", "walk_in", "corporate"]
 STAY_STATUSES = ["", "occupied", "no_show", "cancelled", "early_departure", "day_use"]
 DISPUTE_STAGES = ["", "inquiry", "chargeback", "pre_arbitration", "second_chargeback", "arbitration"]
@@ -77,12 +93,21 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    .main-header { font-size: 2.2rem; font-weight: 700; color: #1E3A8A; margin-bottom: 0px; }
+    :root {
+        --fs-primary: #1E3A8A;
+        --fs-accent: #2563EB;
+        --fs-bg: #FFFFFF;
+        --fs-text: #0F172A;
+        --fs-font: sans-serif;
+        --fs-radius: 6px;
+    }
+    .main-header { font-size: 2.2rem; font-weight: 700; color: var(--fs-primary); margin-bottom: 0px; font-family: var(--fs-font); }
     .sub-header { font-size: 1.05rem; color: #475569; margin-bottom: 20px; }
     .stTabs [data-baseweb="tab-list"] { gap: 8px; }
-    .stTabs [data-baseweb="tab"] { padding: 10px 18px; border-radius: 6px 6px 0px 0px; font-weight: 600; }
+    .stTabs [data-baseweb="tab"] { padding: 10px 18px; border-radius: var(--fs-radius) var(--fs-radius) 0px 0px; font-weight: 600; }
     .badge { display: inline-block; padding: 3px 8px; font-size: 12px; font-weight: 600;
              border-radius: 4px; background-color: #DBEAFE; color: #1E40AF; }
+    .fs-brand-logo { max-height: 44px; margin-bottom: 6px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -134,7 +159,7 @@ def reset_outputs() -> None:
 
 
 def normalize_docs_input(docs: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-    """Scenario/API-shaped supporting docs -> EvidenceItem dicts keyed by registry key."""
+    """Reference/API-shaped supporting docs -> EvidenceItem dicts keyed by registry key."""
     out: Dict[str, Dict[str, Any]] = {}
     for key in SUPPORTING_DOC_TYPES:
         value = (docs or {}).get(key)
@@ -151,8 +176,206 @@ def set_evidence_items(items: Dict[str, Dict[str, Any]]) -> None:
         st.session_state[f"doc_{key}"] = bool(items.get(key, {}).get("present"))
 
 
+def _set_evidence_present(key: str, present: bool) -> None:
+    """Set an evidence checkbox value from a callback or pre-widget code path."""
+    st.session_state[f"doc_{key}"] = bool(present)
+
+
+def _exhibit_store() -> ExhibitStore:
+    """Session exhibit store backed by the persistent content-addressed root.
+
+    Bytes survive session/server restarts (keyed by SHA-256 under
+    config.exhibit_store_dir). Falls back to in-memory if the directory
+    cannot be created (e.g. read-only deployment).
+    """
+    store = st.session_state.get("exhibit_store")
+    if store is None:
+        try:
+            store = ExhibitStore(root=config.exhibit_store_dir)
+        except OSError:
+            store = ExhibitStore()
+        st.session_state.exhibit_store = store
+    return store
+
+
+def _store_evidence_bytes(key: str, label: str, filename: str, data: bytes, via: str = "upload") -> str:
+    """Stores evidence bytes into a slot (shared by single upload + ZIP import).
+
+    Returns the SHA-256 digest. Raises ValueError on validation failure.
+    Preserves probative details/provenance/vision check when replacing a
+    file with identical bytes; clears them when the bytes change.
+    """
+    digest = AuditLogger.calculate_sha256(data)
+    validate_upload(data, filename, max_bytes=config.max_upload_bytes)
+    store = _exhibit_store()
+    stored = store.put(data, filename)
+    stored_docs = dict(st.session_state.get("evidence_items") or {})
+    previous = stored_docs.get(key) or {}
+    new_item = EvidenceItem(
+        doc_type=key, present=True, filename=filename, sha256=digest,
+        verified_by=actor(), verified_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        size_bytes=stored["size_bytes"], mime=stored["mime"], stored_ref=stored["stored_ref"],
+    ).to_dict()
+    if previous.get("sha256") == digest:
+        for preserved in ("details", "vision_check", "original_type", "original_location",
+                          "extracted_by", "extracted_at", "extraction_method", "system_name"):
+            if previous.get(preserved):
+                new_item[preserved] = previous[preserved]
+    stored_docs[key] = new_item
+    st.session_state.evidence_items = stored_docs
+    st.session_state.processed_uploads[f"evidence_{key}"] = digest
+    _set_evidence_present(key, True)
+    log("evidence_file_collected", {"doc_type": key, "filename": filename, "sha256": digest,
+                                    "size_bytes": stored["size_bytes"], "via": via,
+                                    "message": f"{label} collected as evidence file"})
+    return digest
+
+
+def _collect_evidence_file(key: str, label: str) -> None:
+    """File-uploader callback; runs before widgets are rebuilt on the next run."""
+    ev_file = st.session_state.get(f"evfile_{key}")
+    if ev_file is None:
+        return
+    ev_bytes = ev_file.getvalue()
+    digest = AuditLogger.calculate_sha256(ev_bytes)
+    if st.session_state.processed_uploads.get(f"evidence_{key}") == digest:
+        return
+    try:
+        _store_evidence_bytes(key, label, ev_file.name, ev_bytes)
+    except ValueError as e:
+        st.session_state.processed_uploads.pop(f"evidence_{key}", None)
+        st.session_state.evidence_upload_error = f"❌ {e}"
+        return
+    reset_outputs()
+
+
+def _import_evidence_zip() -> None:
+    """ZIP-uploader callback: routes each archived file to its evidence slot."""
+    zip_file = st.session_state.get("evidence_zip_uploader")
+    if zip_file is None:
+        return
+    zip_bytes = zip_file.getvalue()
+    zip_digest = AuditLogger.calculate_sha256(zip_bytes)
+    if st.session_state.processed_uploads.get("evidence_zip") == zip_digest:
+        return
+    st.session_state.processed_uploads["evidence_zip"] = zip_digest
+    max_total = max(config.max_upload_bytes * 5, 10 * 1024 * 1024)
+    if len(zip_bytes) > max_total:
+        st.session_state.evidence_zip_report = {
+            "error": f"'{zip_file.name}' is {len(zip_bytes) / 1_048_576:.1f} MB; the ZIP limit is {max_total // 1_048_576} MB. "
+                     "Split the archive and retry."
+        }
+        return
+    plan = plan_zip_import(zip_bytes, max_file_bytes=config.max_upload_bytes,
+                           max_total_bytes=max_total)
+    if not plan.get("ok"):
+        st.session_state.evidence_zip_report = {"error": plan.get("error") or "Could not read that ZIP archive."}
+        return
+    imported, failed = [], []
+    for doc_type, entry in (plan.get("matched") or {}).items():
+        label = SUPPORTING_DOC_TYPES.get(doc_type, doc_type)
+        try:
+            digest = _store_evidence_bytes(doc_type, label, entry["filename"], entry["data"], via=f"zip:{entry.get('via')}")
+            imported.append({"doc_type": doc_type, "label": label, "filename": entry["filename"],
+                             "via": entry.get("via"), "sha256": digest})
+        except ValueError as e:
+            failed.append({"filename": entry["filename"], "reason": str(e)})
+    st.session_state.evidence_zip_report = {
+        "archive": zip_file.name, "imported": imported, "failed": failed,
+        "unmatched": plan.get("unmatched") or [], "skipped": plan.get("skipped") or [],
+    }
+    log("evidence_zip_imported", {"archive": zip_file.name, "archive_sha256": zip_digest,
+                                  "imported": [{"doc_type": i["doc_type"], "filename": i["filename"], "sha256": i["sha256"]} for i in imported],
+                                  "unmatched": plan.get("unmatched") or [],
+                                  "skipped": plan.get("skipped") or [],
+                                  "message": f"ZIP import: {len(imported)} file(s) collected from {zip_file.name}"})
+    if imported:
+        reset_outputs()
+
+
+def _remove_evidence_file(key: str, label: str) -> None:
+    """Remove-button callback; runs before widgets are rebuilt on the next run."""
+    stored = dict(st.session_state.get("evidence_items") or {})
+    stored[key] = EvidenceItem(doc_type=key, present=False).to_dict()
+    st.session_state.evidence_items = stored
+    _set_evidence_present(key, False)
+    st.session_state.processed_uploads.pop(f"evidence_{key}", None)
+    reset_outputs()
+    log("evidence_file_removed", {"doc_type": key, "message": f"{label} evidence file removed"})
+
+
+# Evidence slots whose files are visual documents a vision model can review.
+VISION_CHECKABLE_DOC_TYPES = {
+    "signed_registration_card", "id_verification_log", "pos_signed_slips",
+    "emv_terminal_receipt", "cancellation_policy_acceptance",
+    "incident_damage_evidence", "cctv_footage", "suspect_id_copy",
+    "witness_declaration", "demand_letter", "refund_credit_receipt",
+    "guest_service_log", "guest_communication_log", "booking_confirmation",
+}
+_VISION_DOC_TYPE_LABELS = {
+    "signed_registration_card": "Registration Card",
+    "id_verification_log": "Government Photo ID",
+    "suspect_id_copy": "Government Photo ID",
+    "pos_signed_slips": "POS Signed Slip",
+    "emv_terminal_receipt": "Terminal Receipt",
+    "booking_confirmation": "Booking Confirmation",
+}
+
+
+def _run_vision_check(key: str, label: str) -> None:
+    """Vision-Check button callback: analyzes the collected exhibit file.
+
+    The finding is stored on the evidence item, bound to the exhibit's
+    SHA-256. It is advisory only — it never changes presence or readiness.
+    Runs as a callback so session state updates before widgets rebuild.
+    """
+    stored = dict(st.session_state.get("evidence_items") or {})
+    item = dict(stored.get(key) or {})
+    if not llama_engine.is_api_configured():
+        st.session_state.vision_check_error = (
+            "No vision provider is configured, so the document was not analyzed. In the sidebar under "
+            "AI Processing, choose Groq, Together AI, or OpenRouter and enter an API key — or set "
+            "LLAMA_PROVIDER and the provider's API key in .env — then run the check again."
+        )
+        return
+    store = _exhibit_store()
+    data = store.get(item.get("stored_ref") or item.get("sha256"), item.get("filename") or "")
+    if not data:
+        st.session_state.vision_check_error = "The collected file bytes are no longer available in this session. Re-attach the file, then run the check again."
+        return
+    filename = item.get("filename") or ""
+    is_pdf = filename.lower().endswith(".pdf") or data.startswith(b"%PDF")
+    analysis_bytes = data
+    rendered_hash = None
+    if is_pdf:
+        try:
+            analysis_bytes = DocumentExtractor.pdf_first_page_to_image(data)
+            rendered_hash = AuditLogger.calculate_sha256(analysis_bytes)
+        except ExtractionError as e:
+            st.session_state.vision_check_error = str(e)
+            return
+    doc_type_label = _VISION_DOC_TYPE_LABELS.get(key) or _infer_vision_doc_type(filename)
+    result = llama_engine.analyze_visual_evidence(analysis_bytes, document_type=doc_type_label)
+    check = {
+        **result,
+        "sha256": item.get("sha256"),
+        "filename": filename,
+        "source_type": "pdf" if is_pdf else "image",
+        "checked_by": actor(),
+        "checked_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+    }
+    if is_pdf:
+        check["rendered_sha256"] = rendered_hash
+        check["page_analyzed"] = 1
+    item["vision_check"] = check
+    stored[key] = item
+    st.session_state.evidence_items = stored
+    log("vision_check_completed", {"doc_type": key, **check,
+                                   "message": f"Vision check completed for {label}"})
+
+
 def load_case(notice: Dict[str, Any], folio: Dict[str, Any], docs: Dict[str, Any]) -> None:
-    st.session_state.notice_data = {**empty_notice(), **json.loads(json.dumps(notice))}  # deep copy; never mutate SCENARIOS
+    st.session_state.notice_data = {**empty_notice(), **json.loads(json.dumps(notice))}  # deep copy; never mutate reference-case data
     st.session_state.folio_data = {**empty_folio(), **json.loads(json.dumps(folio))}
     set_evidence_items(normalize_docs_input(docs))
     st.session_state.processed_uploads = {}
@@ -176,12 +399,20 @@ def init_state() -> None:
 
 
 def current_evidence_items() -> Dict[str, Dict[str, Any]]:
-    """Evidence registry view: checkbox attestations merged with collected files."""
+    """Evidence registry view: checkbox attestations merged with collected files.
+
+    Each file-backed item is annotated with ``bytes_retained`` — whether the
+    exhibit store can actually produce its bytes right now — so exhibits are
+    only cited as "attached" when they can truly be bundled.
+    """
     items: Dict[str, Dict[str, Any]] = {}
     stored = st.session_state.get("evidence_items") or {}
+    store = _exhibit_store()
     for key in SUPPORTING_DOC_TYPES:
         item = dict(stored.get(key) or {"doc_type": key, "present": False, "details": {}})
         item["present"] = bool(st.session_state.get(f"doc_{key}", item.get("present")))
+        if item.get("filename") and item.get("sha256"):
+            item["bytes_retained"] = store.has(item.get("stored_ref") or item.get("sha256"), item.get("filename") or "")
         items[key] = item
     return items
 
@@ -206,6 +437,11 @@ def current_fingerprint_bundle() -> Dict[str, Any]:
     )
 
 
+def current_packet_format() -> str:
+    """Selected packet format; part of packet identity (not the approval fingerprint)."""
+    return "complete" if st.session_state.get("packet_format") == "complete" else "executive"
+
+
 def new_upload(slot: str, data: bytes) -> bool:
     """True only the first time a given file is seen in a slot (Streamlit reruns the script on every click)."""
     digest = AuditLogger.calculate_sha256(data)
@@ -223,21 +459,21 @@ init_state()
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("## 🛡️ **FolioShield**")
-    st.caption("**Autonomous Chargeback Defense & Evidence Builder**\n*Meta Llama Hackathon Submission*")
+    st.caption("**Hotel Chargeback Defense & Evidence Management**")
 
     # Environment Badge
     if config.is_production:
-        st.markdown("<span class='badge' style='background-color:#DCFCE7; color:#15803D;'>🟢 PRODUCTION ENVIRONMENT</span>", unsafe_allow_html=True)
+        st.markdown("<span class='badge' style='background-color:#DCFCE7; color:#15803D;'>🟢 PRODUCTION</span>", unsafe_allow_html=True)
     elif config.is_testing:
-        st.markdown("<span class='badge' style='background-color:#FEF3C7; color:#B45309;'>🧪 TESTING ENVIRONMENT</span>", unsafe_allow_html=True)
+        st.markdown("<span class='badge' style='background-color:#FEF3C7; color:#B45309;'>🧪 TESTING</span>", unsafe_allow_html=True)
     else:
-        st.markdown("<span class='badge' style='background-color:#E0E7FF; color:#4338CA;'>🛠️ DEVELOPMENT ENVIRONMENT</span>", unsafe_allow_html=True)
+        st.markdown("<span class='badge' style='background-color:#E0E7FF; color:#4338CA;'>🛠️ DEVELOPMENT</span>", unsafe_allow_html=True)
     st.markdown("---")
 
     if config.enable_test_scenarios:
-        st.markdown("### ⚡ **Test Scenario Quick-Loader**")
+        st.markdown("### 📚 **Reference Case Library**")
         selected_scenario = st.selectbox(
-            "Choose test scenario or custom upload:",
+            "Open a reference case or start a new dispute:",
             options=list(SCENARIO_OPTIONS.keys()),
             format_func=SCENARIO_OPTIONS.get,
             index=list(SCENARIO_OPTIONS).index(st.session_state.current_scenario_key),
@@ -246,25 +482,25 @@ with st.sidebar:
             st.session_state.current_scenario_key = selected_scenario
             if selected_scenario == "custom":
                 load_case(empty_notice(), empty_folio(), {})
-                log("custom_case_started", {"message": "Cleared case for custom document upload"})
+                log("custom_case_started", {"message": "Started new dispute case"})
             else:
                 s_data = SCENARIOS[selected_scenario]
                 load_case(s_data["notice"], s_data["folio"], s_data["supporting_docs"])
-                log("scenario_loaded", {"scenario": selected_scenario, "message": f"Loaded {s_data['title']}"})
+                log("reference_case_loaded", {"scenario": selected_scenario, "message": f"Opened reference case: {s_data['title']}"})
             st.rerun()
     else:
-        st.markdown("### 📂 **Live Document Intake**")
-        st.caption("Active: Upload live guest dispute notices and folios in Tab 1 (test scenarios disabled in production).")
+        st.markdown("### 📂 **Document Intake**")
+        st.caption("Upload dispute notices and guest folios in Tab 1.")
 
     st.markdown("---")
     st.markdown("### 👤 **Reviewer**")
-    st.text_input("Reviewer name (recorded in audit log):", key="reviewer_name", placeholder="e.g. A. Rivera, Revenue Manager")
+    st.text_input("Reviewer name (recorded in audit log):", key="reviewer_name", placeholder="Full name and title")
     st.selectbox("Reviewer role:", ["Manager", "Front Office Manager", "General Manager", "Revenue Manager", "Night Auditor", "Finance"], key="reviewer_role")
     merchant_name = st.text_input("Merchant / property name:", value=DEFAULT_MERCHANT,
                                   help="Used when the uploaded folio does not state the property name.")
 
     st.markdown("---")
-    st.markdown("### 🤖 **Meta Llama AI Engine**")
+    st.markdown("### 🤖 **AI Processing**")
     env_provider = config.llama_provider
     provider_labels = list(PROVIDER_OPTIONS)
     default_label = next((lbl for lbl, code in PROVIDER_OPTIONS.items() if code == env_provider), provider_labels[0])
@@ -285,11 +521,11 @@ with st.sidebar:
 
     llama_engine = LlamaEngine(provider=provider_code, api_key=api_key_input or None)
     if llama_engine.is_api_configured():
-        st.success(f"🟢 {provider_label} key configured (Llama 3.3 70B + Vision)")
+        st.success(f"🟢 {provider_label} connected")
     elif provider_code == OFFLINE_PROVIDER:
-        st.info("🟡 Offline template mode — no data leaves this machine")
+        st.info("🟡 Local processing enabled — documents are processed on this system")
     else:
-        st.warning("🟠 No API key found — falling back to offline template")
+        st.warning("🟠 AI provider not configured — local processing will be used")
 
     st.markdown("---")
     st.markdown("### 🔐 **Compliance Safeguards**")
@@ -316,7 +552,7 @@ def current_fingerprint() -> str:
 
 def retained_exhibit_files() -> Dict[str, bytes]:
     """Exhibit letter -> retained bytes for exhibits whose files we still hold."""
-    store: ExhibitStore = st.session_state.setdefault("exhibit_store", ExhibitStore())
+    store = _exhibit_store()
     out: Dict[str, bytes] = {}
     items_by_type = {i.get("doc_type"): i for i in (reconciliation.get("evidence_items") or [])}
     for exhibit in (reconciliation.get("exhibits") or []):
@@ -370,19 +606,25 @@ with m5:
 
 if collection_gaps:
     gap_preview = "; ".join(g["message"] for g in collection_gaps[:3])
-    st.warning(f"📥 **Phase 1 collection gaps ({len(collection_gaps)}):** {gap_preview}"
+    st.warning(f"📥 **Collection gaps ({len(collection_gaps)}):** {gap_preview}"
                + (" …resolve in Tab 1 / Tab 2 before approval." if len(collection_gaps) > 3 else ""))
 
 st.markdown("<br/>", unsafe_allow_html=True)
 
 # Embedded mode: only server-validated signed context is trusted. Raw query
 # parameters such as tenant/role are never used for authorization by themselves.
+# Theming follows the same rule: host theme values are accepted only from the
+# signed context (or server-side env defaults); otherwise the FolioShield
+# default theme applies unchanged.
 embedded_context = None
+active_theme = None
 try:
     from embedded.configuration import EmbeddedConfiguration
     from embedded.context import validate_context_token
+    from embedded.theme import HostTheme
 
     _embedded_cfg = EmbeddedConfiguration.from_env()
+    active_theme = _embedded_cfg.resolve_theme()
     _embedded_token = st.query_params.get("fs_embed_token") if hasattr(st, "query_params") else None
     if isinstance(_embedded_token, list):
         _embedded_token = _embedded_token[0] if _embedded_token else None
@@ -391,6 +633,7 @@ try:
             _embedded_token, _embedded_cfg.signing_secret, issuer=_embedded_cfg.issuer,
             audience=_embedded_cfg.audience, allowed_origins=_embedded_cfg.allowed_origins or None,
             origin=st.query_params.get("fs_embed_origin") if hasattr(st, "query_params") else None)
+        active_theme = _embedded_cfg.resolve_theme(embedded_context.theme)
         st.info(
             f"🔗 Embedded session validated for tenant `{embedded_context.tenant_id}` · "
             f"user `{embedded_context.user_id}` · view `{_embedded_cfg.validate_view(embedded_context.view)}` · "
@@ -407,6 +650,13 @@ try:
 except Exception as embedded_error:
     st.error(f"Embedded session rejected: {embedded_error}")
     log("embedded_session_rejected", {"error": str(embedded_error), "message": "Embedded context validation failed"})
+
+if active_theme is not None:
+    st.markdown(active_theme.css(), unsafe_allow_html=True)
+    if active_theme.logo_url:
+        st.markdown(f'<img class="fs-brand-logo" src="{active_theme.logo_url}" alt="Host brand logo"/>', unsafe_allow_html=True)
+    if active_theme.brand_name and active_theme.brand_name != "FolioShield":
+        st.caption(f"🏨 {active_theme.brand_name} · Powered by FolioShield")
 
 tab_ingest, tab_audit, tab_rebuttal, tab_pdf, tab_legal, tab_integrations, tab_logs = st.tabs([
     "📄 1. Upload Notice & Guest Folio",
@@ -558,7 +808,7 @@ with tab_ingest:
                 current_channel = raw_folio.get("booking_channel") or ""
                 f_channel = st.selectbox("Booking channel", BOOKING_CHANNELS,
                                          index=BOOKING_CHANNELS.index(current_channel) if current_channel in BOOKING_CHANNELS else 0)
-                f_source = st.text_input("Booking source (e.g. Booking.com)", value=raw_folio.get("booking_source") or "")
+                f_source = st.text_input("Booking source / channel partner", value=raw_folio.get("booking_source") or "")
                 f_rate_plan = st.text_input("Rate plan", value=raw_folio.get("rate_plan") or "")
                 f_rate = st.number_input("Rate per night", min_value=0.0, step=0.01, format="%.2f",
                                          value=float(raw_folio.get("rate_per_night") or 0.0))
@@ -620,46 +870,17 @@ with tab_ingest:
                         st.info("No changes to save.")
 
     if collection_gaps:
-        st.markdown("#### 📥 Phase 1 Collection Gaps")
+        st.markdown("#### 📥 Collection Gaps")
         for gap in collection_gaps:
             render = st.error if gap.get("severity") == "critical" else st.warning
             render(f"**{gap.get('field')}:** {gap.get('message')}")
 
     st.markdown("---")
-    st.markdown("#### 👁️ Scanned Evidence & Signature Check (Vision AI)")
-    st.caption("Upload photos/scans of supporting documents. Choose the document type so findings attach to the right evidence item in Tab 2.")
-
-    vision_type = st.selectbox("Document type:", VISION_DOC_TYPES, key="vision_doc_type")
-    img_file = st.file_uploader("Upload Scanned Document / Receipt Image (Optional):",
-                                type=["png", "jpg", "jpeg"], key="vision_uploader")
-    if img_file:
-        img_bytes = img_file.getvalue()
-        img_hash = AuditLogger.calculate_sha256(img_bytes)
-        try:
-            validate_upload(img_bytes, img_file.name, max_bytes=config.max_upload_bytes)
-        except ValueError as e:
-            st.error(f"❌ {e}")
-        else:
-            col_img, col_vis_res = st.columns([1, 2])
-            with col_img:
-                st.image(img_bytes, caption=f"{vision_type} — {img_file.name}", width="stretch")
-            with col_vis_res:
-                if st.button("Run Llama Vision Analysis", type="primary"):
-                    with st.spinner("Analyzing visual evidence via Meta Llama Vision..."):
-                        vis_res = llama_engine.analyze_visual_evidence(img_bytes, document_type=vision_type)
-                    st.session_state.vision_results[vision_type] = {**vis_res, "sha256": img_hash, "filename": img_file.name}
-                    log("vision_analysis_completed", {**vis_res, "sha256": img_hash, "filename": img_file.name})
-
-                vis = (st.session_state.get("vision_results") or {}).get(vision_type)
-                if vis:
-                    st.markdown("##### 🔍 Vision Audit Findings")
-                    st.json(vis)
-                    if not vis.get("analyzed"):
-                        st.warning("⚠️ Image was not machine-analyzed. Verify the document manually before relying on it.")
-                    elif vis.get("signature_detected") is True:
-                        st.success("✓ Model reports a signature is visible. Confirm visually, then collect it as an evidence file in Tab 2.")
-                    else:
-                        st.warning("⚠️ Model did not confirm a signature on this document.")
+    st.info(
+        "👁️ **Looking for the scan/signature check?** It now lives with the evidence itself: attach the file in "
+        "**Tab 2 → Compelling Evidence Collection**, then open **Vision check** under that exhibit. One upload — "
+        "the finding is recorded against the collected file's SHA-256 in the chain of custody."
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -730,7 +951,40 @@ with tab_audit:
     st.markdown("---")
     st.markdown("#### 3. Compelling Evidence Collection (Files Win Cases)")
     st.caption("Check only documents you actually have. **Attach the file** so it is hashed into the chain of custody — "
-               "collected files score higher than attestations and are indexed as exhibits in the packet.")
+               "collected files score higher than attestations and are indexed as exhibits in the packet. "
+               "For scans and PDFs, an optional **Vision check** under each exhibit reviews signature/legibility.")
+
+    with st.expander("📦 Bulk import — upload a ZIP of evidence files", expanded=False):
+        st.caption(
+            "Export from your PMS / lock system / gateway, zip the files, and drop the archive here. Each file is routed to its "
+            "evidence slot below and hashed into the chain of custody, exactly as if attached individually. "
+            "Matching: a `manifest.json` in the ZIP (`{\"wifi_usage_log\": \"wifi.csv\"}`) wins, then filenames containing the slot key "
+            "(e.g. `wifi_usage_log.csv`), then filename keywords (e.g. `keycard`, `3ds`, `cctv`). Unmatched files are reported, never guessed."
+        )
+        st.file_uploader("Evidence ZIP archive", type=["zip"], key="evidence_zip_uploader",
+                         on_change=_import_evidence_zip)
+        zip_report = st.session_state.get("evidence_zip_report")
+        if zip_report:
+            if zip_report.get("error"):
+                st.error(f"❌ {zip_report['error']}")
+            else:
+                imported = zip_report.get("imported") or []
+                if imported:
+                    st.success(f"✓ Imported {len(imported)} file(s) from {zip_report.get('archive')}:")
+                    for entry in imported:
+                        st.write(f"- **{entry['label']}** ← `{entry['filename']}` (matched by {entry['via']})")
+                else:
+                    st.warning("No files were imported from that archive.")
+                for failure in zip_report.get("failed") or []:
+                    st.error(f"❌ `{failure['filename']}` — {failure['reason']}")
+                for skipped in zip_report.get("skipped") or []:
+                    st.warning(f"⚠️ Skipped `{skipped['filename']}` — {skipped['reason']}")
+                unmatched = zip_report.get("unmatched") or []
+                if unmatched:
+                    st.warning("⚠️ **Not matched to a slot** (attach manually below, or rename / add a manifest.json): "
+                               + ", ".join(f"`{name}`" for name in unmatched))
+                st.caption("Probative details (recipient, timestamps, amounts) are still recorded per exhibit below — "
+                           "the ZIP fills the file slots, the details prove them.")
 
     for group_key, group in SUPPORTING_DOC_GROUPS.items():
         st.markdown(f"##### {group['label']}")
@@ -741,60 +995,63 @@ with tab_audit:
             with cols[0]:
                 st.checkbox(label, key=f"doc_{key}", help=SUPPORTING_DOC_GUIDANCE.get(key))
                 if item.get("filename"):
-                    st.caption(f"📎 {item['filename']} · SHA-256 {str(item.get('sha256') or '')[:12]}…"
-                               + (f" · ✓ {item['verified_by']}" if item.get("verified_by") else ""))
+                    if item.get("bytes_retained"):
+                        st.caption(f"📎 {item['filename']} · SHA-256 {str(item.get('sha256') or '')[:12]}…"
+                                   + (f" · ✓ {item['verified_by']}" if item.get("verified_by") else "")
+                                   + " · file retained")
+                    else:
+                        st.caption(f"📎 {item['filename']} · SHA-256 {str(item.get('sha256') or '')[:12]}…"
+                                   " · ⚠️ metadata only — file bytes not retained. Re-attach the file so it can be bundled as an exhibit.")
                 elif item.get("present"):
                     st.caption("Attested only — attach the file to strengthen this exhibit.")
             with cols[1]:
-                ev_file = st.file_uploader(f"Attach {label}", type=["pdf", "png", "jpg", "jpeg", "csv", "eml", "txt"],
-                                           key=f"evfile_{key}", label_visibility="collapsed")
-                if ev_file:
-                    ev_bytes = ev_file.getvalue()
-                    slot = f"evidence_{key}"
-                    if new_upload(slot, ev_bytes):
-                        try:
-                            validate_upload(ev_bytes, ev_file.name, max_bytes=config.max_upload_bytes)
-                        except ValueError as e:
-                            st.session_state.processed_uploads.pop(slot, None)
-                            st.error(f"❌ {e}")
-                        else:
-                            digest = AuditLogger.calculate_sha256(ev_bytes)
-                            # Phase 6: retain the bytes so exhibits can be bundled
-                            store = st.session_state.setdefault("exhibit_store", ExhibitStore())
-                            stored = store.put(ev_bytes, ev_file.name)
-                            new_item = EvidenceItem(
-                                doc_type=key, present=True, filename=ev_file.name, sha256=digest,
-                                verified_by=actor(), verified_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-                                size_bytes=stored["size_bytes"], mime=stored["mime"], stored_ref=stored["stored_ref"],
-                            ).to_dict()
-                            stored_docs = dict(st.session_state.get("evidence_items") or {})
-                            stored_docs[key] = new_item
-                            st.session_state.evidence_items = stored_docs
-                            st.session_state[f"doc_{key}"] = True
-                            reset_outputs()
-                            log("evidence_file_collected", {"doc_type": key, "filename": ev_file.name, "sha256": digest,
-                                                            "size_bytes": stored["size_bytes"],
-                                                            "message": f"{label} collected as evidence file"})
-                            st.rerun()
+                st.file_uploader(f"Attach {label}", type=["pdf", "png", "jpg", "jpeg", "csv", "eml", "txt"],
+                                 key=f"evfile_{key}", label_visibility="collapsed",
+                                 on_change=_collect_evidence_file, args=(key, label))
+                if st.session_state.get("evidence_upload_error"):
+                    st.error(st.session_state.pop("evidence_upload_error"))
             with cols[2]:
-                if item.get("filename") and st.button("Remove", key=f"evremove_{key}"):
-                    stored = dict(st.session_state.get("evidence_items") or {})
-                    stored[key] = EvidenceItem(doc_type=key, present=False).to_dict()
-                    st.session_state.evidence_items = stored
-                    st.session_state[f"doc_{key}"] = False
-                    st.session_state.processed_uploads.pop(f"evidence_{key}", None)
-                    reset_outputs()
-                    log("evidence_file_removed", {"doc_type": key, "message": f"{label} evidence file removed"})
-                    st.rerun()
+                if item.get("filename"):
+                    st.button("Remove", key=f"evremove_{key}", on_click=_remove_evidence_file, args=(key, label))
+            # Vision check: advisory scan/signature review of the collected file.
+            if item.get("filename") and key in VISION_CHECKABLE_DOC_TYPES:
+                with st.expander(f"👁️ Vision check — {label}", expanded=False):
+                    st.caption("Optional AI review of the collected scan: signature visible? guest name / date legible? "
+                               "Advisory only — it does not change evidence status. For PDFs, page 1 is reviewed.")
+                    if llama_engine.is_api_configured():
+                        st.caption(f"Vision provider ready: {llama_engine.provider} · {llama_engine._vision_model()}")
+                    else:
+                        st.warning("No vision provider configured — the check cannot analyze the document yet. "
+                                   "In the sidebar under AI Processing, choose Groq, Together AI, or OpenRouter and enter an API key "
+                                   "(or set LLAMA_PROVIDER and the provider key in .env).")
+                    if st.session_state.get("vision_check_error"):
+                        st.error(st.session_state.pop("vision_check_error"))
+                    st.button("Run Vision Check", key=f"visioncheck_{key}", on_click=_run_vision_check, args=(key, label))
+                    check = item.get("vision_check") or {}
+                    if check and check.get("sha256") == item.get("sha256"):
+                        if not check.get("analyzed"):
+                            reason = str(check.get("notes") or "").strip()
+                            if reason.startswith("Vision model call failed"):
+                                st.warning(f"⚠️ The vision provider call failed, so this document was not analyzed. Verify it visually. Details: {reason}")
+                            else:
+                                st.warning("⚠️ This check was recorded without a configured vision provider, so the document was not analyzed. Configure a provider in the sidebar (AI Processing), then run the check again.")
+                        elif check.get("signature_detected") is True:
+                            st.success(f"✓ Model reports a signature is visible · {check.get('checked_by', '')} · {check.get('checked_at', '')}")
+                        else:
+                            st.warning("⚠️ Model did not confirm a signature on this document. Verify visually before relying on it.")
+                        with st.expander("Vision check details", expanded=False):
+                            st.json(check)
+                    elif check:
+                        st.caption("A vision check exists for a previous version of this file. Run it again for the current file.")
             # Probative detail capture for validators (Phase 3)
             detail_fields = {
-                "pos_signed_slips": [("slip_reference", "Slip reference (e.g. POS-4102)"), ("amount", "Slip amount ($)")],
+                "pos_signed_slips": [("slip_reference", "Slip / check reference"), ("amount", "Slip amount ($)")],
                 "guest_service_log": [("unresolved_complaints", "Unresolved complaints (0 = clean log)")],
                 "keycard_lock_audit": [("first_entry", "First door entry (YYYY-MM-DD HH:MM)"), ("last_entry", "Last door entry")],
                 "wifi_usage_log": [("first_entry", "First seen (YYYY-MM-DD HH:MM)"), ("last_entry", "Last seen")],
                 "booking_confirmation": [("recipient", "Recipient email"), ("sent_at", "Sent at (timestamp)")],
                 "cancellation_policy_acceptance": [("accepted_at", "Accepted at (timestamp)")],
-                "avs_cvv_result": [("avs_result", "AVS result (e.g. Y)"), ("cvv_result", "CVV result")],
+                "avs_cvv_result": [("avs_result", "AVS result code"), ("cvv_result", "CVV result")],
                 "refund_credit_receipt": [("amount", "Refund amount ($)"), ("reference", "Refund reference")],
             }.get(key)
             if detail_fields and item.get("present"):
@@ -834,11 +1091,11 @@ with tab_audit:
                                              index=(["", "wet_original", "copy", "scan", "e_signature", "system_export"].index(prov.get("original_type") or "")),
                                              key=f"prov_type_{key}")
                         oloc = st.text_input("Original location:", value=prov.get("original_location") or "", key=f"prov_loc_{key}",
-                                             placeholder="e.g. Front desk cabinet 3 / e-sig platform")
+                                             placeholder="Physical file location or e-signature platform")
                     with pcols[1]:
                         exby = st.text_input("Extracted/collected by:", value=prov.get("extracted_by") or "", key=f"prov_by_{key}")
                         exmethod = st.text_input("Extraction method / system:", value=prov.get("extraction_method") or prov.get("system_name") or "",
-                                                 key=f"prov_method_{key}", placeholder="e.g. Onity HT28 export, room+date filter")
+                                                 key=f"prov_method_{key}", placeholder="System name, export method, and filters used")
                     if st.button("Save provenance", key=f"prov_save_{key}"):
                         stored = dict(st.session_state.get("evidence_items") or {})
                         updated = dict(stored.get(key) or item)
@@ -890,7 +1147,7 @@ with tab_rebuttal:
         st.text_area(
             "Front Desk Notes / Special Guest Context (Optional):",
             key="custom_notes",
-            placeholder="e.g. Guest checked in with agent Sarah at 3:15pm, ordered room service on night 2, and concierge booked airport transfer.",
+            placeholder="Add verified operational context: check-in details, services used, guest communications, and staff observations.",
             help="Included in the drafting prompt as front desk notes (sanitized, max 2,000 characters).",
         )
     with col_reb_gen:
@@ -916,7 +1173,7 @@ with tab_rebuttal:
     unresolved = draft_text.count("[MISSING")
 
     # --- Submission gate ------------------------------------------------------
-    st.markdown("#### 🚦 Submission Gate (Phase 1 Collection + Phase 3 Evidence + Phase 4 Draft)")
+    st.markdown("#### 🚦 Submission Readiness Gate")
     missing_dispositive = (reconciliation.get("evidence_readiness") or {}).get("missing_dispositive") or []
     gate_reasons = [f"{g.get('field')}: {g.get('message')}" for g in critical_gaps]
     gate_reasons += [f"Dispositive evidence missing: {label}" for label in missing_dispositive]
@@ -927,13 +1184,13 @@ with tab_rebuttal:
             st.error(f"❌ **{reason}**")
         st.checkbox("Override gate — approve anyway (reason is recorded in the audit log)", key="gate_override")
         if st.session_state.get("gate_override"):
-            st.text_input("Override reason (required):", key="gate_override_reason", placeholder="e.g. ARN confirmed by phone with processor, ref #…")
+            st.text_input("Override reason (required):", key="gate_override_reason", placeholder="Document the reason and supporting reference for this override")
     elif collection_gaps:
         for gap in collection_gaps:
             st.warning(f"⚠️ **{gap.get('field')}:** {gap.get('message')}")
         st.success("No critical collection gaps — warnings above are advisory.")
     else:
-        st.success("✓ All Phase 1 collection items are present.")
+        st.success("✓ All required collection items are present.")
 
     gate_blocked = bool(gate_reasons) and not (
         st.session_state.get("gate_override") and (st.session_state.get("gate_override_reason") or "").strip()
@@ -996,8 +1253,8 @@ with tab_rebuttal:
             st.warning(f"Draft contains {unresolved} `[MISSING ...]` marker(s) — approval is gated until they are resolved or overridden with a logged reason (see Submission Gate above).")
 
     # System-verified facts hint (Phase 4): what the system can vouch for
-    with st.expander("🔎 System-Verified Facts (what FolioShield can vouch for in this draft)", expanded=False):
-        st.caption("Sentences in the draft are system-verified only when they trace to a validated exhibit or a proven Phase 2 proof below. Anything else is staff-typed and attested by the approver.")
+    with st.expander("🔎 System-Verified Facts (what FolioShield can verify in this draft)", expanded=False):
+        st.caption("Sentences in the draft are system-verified only when they trace to a validated exhibit or a completed verification check below. Anything else is staff-typed and attested by the approver.")
         verified_lines = [f"Exhibit {e.get('letter')}: {e.get('label')}" for e in (reconciliation.get("exhibits") or [])]
         verified_lines += [f"Proof — {p['proof']}: {p['detail']}" for p in (reconciliation.get("proofs") or []) if p["status"] == "proven"]
         if verified_lines:
@@ -1021,15 +1278,30 @@ with tab_pdf:
     fingerprint = current_fingerprint()
     approval = st.session_state.approval
     is_approved = bool(approval and approval["fingerprint"] == fingerprint)
-    pdf_current = st.session_state.generated_pdf is not None and st.session_state.pdf_fingerprint == fingerprint
+    packet_format = current_packet_format()
+    pdf_identity = f"{fingerprint}:{packet_format}"
+    pdf_current = st.session_state.generated_pdf is not None and st.session_state.pdf_fingerprint == pdf_identity
 
     if not is_approved:
         st.info("🔒 Approve the defense letter in Tab 3 (Manager Sign-Off) to unlock packet compilation.")
 
+    st.radio(
+        "Packet format:",
+        options=["executive", "complete"],
+        format_func=lambda value: "Executive Packet — 3 pages (cover, folio audit, evidence annex)" if value == "executive" else "Complete Packet — 3 pages + exhibit appendix",
+        key="packet_format",
+        horizontal=True,
+        help="Executive keeps the standard three-page packet. Complete appends exhibit appendix pages after page 3 using retained evidence files.",
+    )
+    packet_format = current_packet_format()
+    pdf_identity = f"{fingerprint}:{packet_format}"
+    pdf_current = st.session_state.generated_pdf is not None and st.session_state.pdf_fingerprint == pdf_identity
+
     col_btn_gen, col_btn_dl = st.columns(2)
     with col_btn_gen:
-        if st.button("🔨 Compile 3-Page Bank Evidence Packet", type="primary", width="stretch", disabled=not is_approved):
-            with st.spinner("Generating 3-page PDF evidence packet..."):
+        compile_label = "🔨 Compile Executive Packet (3 Pages)" if packet_format == "executive" else "🔨 Compile Complete Packet (3 Pages + Appendix)"
+        if st.button(compile_label, type="primary", width="stretch", disabled=not is_approved):
+            with st.spinner("Generating PDF evidence packet..."):
                 from core.client import FolioShield as _FS
                 _fs = _FS()
                 pdf_bytes = _fs.generate_pdf_packet_hashed(
@@ -1039,16 +1311,19 @@ with tab_pdf:
                     policy_text=st.session_state.policy_text,
                     approval_fingerprint=approval["fingerprint"],
                     chain_head=st.session_state.audit_logger.chain_head,
+                    packet_format=packet_format,
+                    exhibit_files=retained_exhibit_files() if packet_format == "complete" else None,
                 )
             st.session_state.generated_pdf = pdf_bytes
-            st.session_state.pdf_fingerprint = fingerprint
+            st.session_state.pdf_fingerprint = pdf_identity
             pdf_current = True
-            log("pdf_packet_generated", {"case_id": notice_data.get("case_id"), "size_bytes": len(pdf_bytes), "pages": 3,
+            log("pdf_packet_generated", {"case_id": notice_data.get("case_id"), "size_bytes": len(pdf_bytes),
+                                         "packet_format": packet_format,
                                          "sha256": AuditLogger.calculate_sha256(pdf_bytes),
                                          "approval_fingerprint": approval["fingerprint"],
                                          "approval_event_hash": approval.get("event_hash"),
                                          "message": "Evidence packet compiled"})
-            st.success("✓ 3-Page Bank Evidence Packet successfully generated (self-verifying custody block on page 3).")
+            st.success("✓ Bank Evidence Packet successfully generated (self-verifying custody block on page 3).")
 
     with col_btn_dl:
         if pdf_current:
@@ -1072,7 +1347,7 @@ with tab_pdf:
 
     if pdf_current:
         st.markdown("#### 👁️ Preview Bank Dispute Packet")
-        st.caption("Preview the exact compiled 3-page PDF before downloading or building the submission bundle. Use the PDF viewer's page controls to inspect pages 1–3.")
+        st.caption("Preview the exact compiled PDF before downloading or building the submission bundle. Use the PDF viewer's page controls to inspect the cover, folio audit, evidence annex, and any appendix pages.")
         preview_col, preview_meta = st.columns([3, 1])
         with preview_meta:
             pdf_hash = AuditLogger.calculate_sha256(st.session_state.generated_pdf or b"")
@@ -1110,7 +1385,7 @@ with tab_pdf:
     unretained = [l for l in cited_letters if l not in retained_letters]
     if unretained:
         st.warning(f"⚠️ Exhibit(s) {', '.join(unretained)} are cited as collected but their file bytes are not retained in this session "
-                   "(e.g. demo scenario data). Re-upload those files in Tab 2 so they can be bundled.")
+                   "(reference data may not include retained file bytes). Re-upload those files in Tab 2 so they can be bundled.")
 
     validation = None
     if pdf_current:
@@ -1376,7 +1651,7 @@ with tab_pdf:
         **🏛️ Page 3: Evidence Annex & Certification**
         - Card network compelling evidence checklist
         - Collected evidence files with SHA-256 provenance
-        - Phase 1 collection gaps to resolve
+        - Collection gaps to resolve
         - Booking cancellation terms disclosure
         - SHA-256 tamper-evident integrity certification
         """)
@@ -1424,7 +1699,7 @@ with tab_legal:
         for w in legal_data["witnesses"]:
             st.markdown(f"- **{w.get('name')}** — {w.get('role')} ({', '.join(w.get('linked_events') or [])})")
     with st.form("add_witness"):
-        w_name = st.text_input("Witness name (e.g. the check-in agent):")
+        w_name = st.text_input("Witness name:")
         w_role = st.text_input("Role:", value="Front Desk Agent")
         w_events = st.multiselect("Linked events:", ["check_in", "id_verified", "key_issued", "checkout"])
         if st.form_submit_button("Register Witness"):
@@ -1447,9 +1722,9 @@ with tab_legal:
                 notice_data, folio_data, manifest_for_legal,
                 affiant={"name": affiant_name, "title": affiant_title})
             st.session_state.legal_affidavit = pdf
-            log("affidavit_generated", {"case_id": case_key, "message": "Business records affidavit TEMPLATE generated"})
+            log("affidavit_generated", {"case_id": case_key, "message": "Business records affidavit template generated"})
         if st.session_state.get("legal_affidavit"):
-            st.download_button("⬇️ Affidavit TEMPLATE", data=st.session_state.legal_affidavit,
+            st.download_button("⬇️ Affidavit Template", data=st.session_state.legal_affidavit,
                                file_name=f"Affidavit_{case_key}.pdf", mime="application/pdf")
     with doc_col2:
         witness_names = [w.get("name") for w in legal_data["witnesses"]]
@@ -1459,25 +1734,25 @@ with tab_legal:
             pdf = generate_witness_declaration(w_rec, notice_data, folio_data, chrono_for_legal["events"])
             st.session_state.legal_declaration = pdf
             log("witness_declaration_generated", {"case_id": case_key, "witness": selected_witness,
-                                                  "message": "Witness declaration TEMPLATE generated"})
+                                                  "message": "Witness declaration template generated"})
         if st.session_state.get("legal_declaration"):
-            st.download_button("⬇️ Declaration TEMPLATE", data=st.session_state.legal_declaration,
+            st.download_button("⬇️ Declaration Template", data=st.session_state.legal_declaration,
                                file_name=f"Declaration_{case_key}.pdf", mime="application/pdf")
     with doc_col3:
-        pay_by = st.text_input("Demand pay-by date:", value="", placeholder="e.g. December 15, 2026")
+        pay_by = st.text_input("Demand pay-by date:", value="", placeholder="Payment due date")
         if st.button("✉️ Demand Letter (PDF)"):
             pdf = generate_demand_letter(notice_data, folio_data, damages, pay_by or "[PAY-BY DATE]")
             st.session_state.legal_demand = pdf
             log("demand_letter_generated", {"case_id": case_key, "amount": damages["net_loss"],
-                                            "message": "Demand letter TEMPLATE generated"})
+                                            "message": "Demand letter template generated"})
         if st.session_state.get("legal_demand"):
-            st.download_button("⬇️ Demand Letter TEMPLATE", data=st.session_state.legal_demand,
+            st.download_button("⬇️ Demand Letter Template", data=st.session_state.legal_demand,
                                file_name=f"DemandLetter_{case_key}.pdf", mime="application/pdf")
 
     st.markdown("#### 🚓 Criminal Fraud Report Pack")
     st.caption("For police / FBI IC3 filings. **Preserve CCTV immediately** — most systems overwrite within days.")
     suspect_desc = st.text_input("Suspect description / fake-ID indicators:", key="suspect_desc",
-                                 placeholder="e.g. ID name did not match guest; photo appeared altered")
+                                 placeholder="Describe identity-document concerns or fraud indicators")
     if st.button("Build Fraud Report (JSON)"):
         report = build_fraud_report(notice_data, folio_data, damages, chrono_for_legal["events"],
                                     suspect={"description": suspect_desc})
@@ -1515,11 +1790,11 @@ with tab_legal:
         (st.success if chk["ok"] else st.warning)(f"{'✓' if chk['ok'] else '✗'} **{chk['rule']}** — {chk['detail']}")
     legal_docs_now: Dict[str, bytes] = {}
     if st.session_state.get("legal_affidavit"):
-        legal_docs_now["Business_Records_Affidavit_TEMPLATE.pdf"] = st.session_state.legal_affidavit
+        legal_docs_now["Business_Records_Affidavit_Template.pdf"] = st.session_state.legal_affidavit
     if st.session_state.get("legal_declaration"):
-        legal_docs_now["Witness_Declaration_TEMPLATE.pdf"] = st.session_state.legal_declaration
+        legal_docs_now["Witness_Declaration_Template.pdf"] = st.session_state.legal_declaration
     if st.session_state.get("legal_demand"):
-        legal_docs_now["Demand_Letter_TEMPLATE.pdf"] = st.session_state.legal_demand
+        legal_docs_now["Demand_Letter_Template.pdf"] = st.session_state.legal_demand
     if st.button("⚖️ Build Court Bundle (ZIP)", disabled=not court_validation["ok"]):
         zip_bytes, info = build_court_bundle(
             notice_data, folio_data, st.session_state.generated_pdf or b"",
@@ -1541,7 +1816,7 @@ with tab_legal:
 
 
 # -----------------------------------------------------------------------------
-# TAB 6: INTEGRATION MANAGEMENT (Enterprise Expansion Phase 5)
+# TAB 6: INTEGRATION MANAGEMENT
 # -----------------------------------------------------------------------------
 with tab_integrations:
     st.subheader("Integration Management")
@@ -1560,7 +1835,7 @@ with tab_integrations:
     webhook_manager = WebhookManager(integration_registry)
 
     mgmt_tenant = st.text_input("Tenant ID to manage:", value=st.session_state.get("mgmt_tenant", ""), key="mgmt_tenant",
-                                placeholder="e.g. grand-horizon")
+                                placeholder="Organization identifier")
     mgmt_confirmed = st.checkbox("I am authorized to manage integrations for this tenant", key="mgmt_confirmed")
     tenant_record = integration_registry.get_tenant(mgmt_tenant) if mgmt_tenant else None
 

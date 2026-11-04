@@ -12,5 +12,6 @@ integration requires vendor/IdP validation with issuer/JWKS configuration.
 
 from .context import EmbeddedContext, create_context_token, validate_context_token
 from .configuration import EmbeddedConfiguration
+from .theme import HostTheme
 
-__all__ = ["EmbeddedContext", "EmbeddedConfiguration", "create_context_token", "validate_context_token"]
+__all__ = ["EmbeddedContext", "EmbeddedConfiguration", "HostTheme", "create_context_token", "validate_context_token"]

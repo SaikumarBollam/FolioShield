@@ -48,6 +48,7 @@ class Settings:
     # Audit & Storage
     log_dir: str
     log_level: str
+    exhibit_store_dir: str
 
     @property
     def is_production(self) -> bool:
@@ -138,6 +139,7 @@ def get_settings(env_override: Optional[str] = None) -> Settings:
         request_timeout_seconds=timeout_sec,
         log_dir=os.getenv("LOG_DIR", "logs"),
         log_level=log_level,
+        exhibit_store_dir=os.getenv("FOLIOSHIELD_EXHIBIT_DIR", "data/exhibits"),
     )
 
 

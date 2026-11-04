@@ -66,7 +66,7 @@ def validate_bundle(
     exhibits = recon.get("exhibits") or []
     missing_files = [e["letter"] for e in exhibits if e.get("file_backed") and e.get("letter") not in exhibit_files]
     check("exhibits_retained", not missing_files,
-          "All cited exhibits retained" if not missing_files else f"Exhibit(s) {', '.join(missing_files)} cited as attached but their files are not retained — re-upload them in Tab 2")
+          "All cited exhibits retained" if not missing_files else f"Exhibit(s) {', '.join(missing_files)} cited as attached but their file bytes could not be retrieved from the exhibit store — re-upload them in Tab 2 (check the exhibit-store directory is writable)")
 
     readiness = recon.get("evidence_readiness") or {}
     check("dispositive_collected", bool(readiness.get("submittable", True)),

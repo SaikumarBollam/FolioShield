@@ -173,6 +173,14 @@ class EvidenceItem:
     system_name: Optional[str] = None        # e.g. "Onity HT28 v4, OPERA PMS 5.6"
     # Document-specific probative facts (recipient, timestamps, result codes…)
     details: Dict[str, Any] = field(default_factory=dict)
+    # Optional vision-AI check of the collected file (advisory only; never
+    # changes presence/readiness). Bound to this item's sha256 when recorded.
+    vision_check: Optional[Dict[str, Any]] = None
+    # Runtime retention signal set by callers holding an exhibit store:
+    # True/False = whether the file bytes can actually be retrieved now;
+    # None = un-annotated (legacy metadata-based behavior). Never proof by
+    # itself — the store lookup is the source of truth.
+    bytes_retained: Optional[bool] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

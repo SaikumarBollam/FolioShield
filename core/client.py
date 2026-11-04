@@ -149,12 +149,17 @@ class FolioShield:
         approved_at: Optional[str] = None,
         policy_text: Optional[str] = None,
         approval_fingerprint: Optional[str] = None,
-        chain_head: Optional[Dict[str, Any]] = None
+        chain_head: Optional[Dict[str, Any]] = None,
+        packet_format: str = "executive",
+        exhibit_files: Optional[Dict[str, bytes]] = None
     ) -> bytes:
         """
         Two-pass packet build: pass 1 computes the packet SHA-256, pass 2
         embeds it (plus approval fingerprint + chain head) in the p.3 custody
         block so the downloaded file is self-verifying.
+
+        packet_format="executive" produces exactly 3 pages (default, unchanged).
+        packet_format="complete" appends an exhibit appendix after page 3.
         """
         n_dict = notice.to_dict() if isinstance(notice, NoticeData) else notice
         f_dict = folio.to_dict() if isinstance(folio, FolioData) else folio
@@ -164,6 +169,7 @@ class FolioShield:
             n_dict, f_dict, reconciliation, rebuttal_text,
             approved_by=approved_by, approved_at=approved_at, policy_text=policy_text,
             approval_fingerprint=approval_fingerprint, chain_head=chain_head,
+            packet_format=packet_format, exhibit_files=exhibit_files,
         )
         packet_hash = AuditLogger.calculate_sha256(first_pass)
         return EvidencePacketGenerator.generate_packet(
@@ -171,6 +177,7 @@ class FolioShield:
             approved_by=approved_by, approved_at=approved_at, policy_text=policy_text,
             approval_fingerprint=approval_fingerprint, chain_head=chain_head,
             packet_sha256=packet_hash,
+            packet_format=packet_format, exhibit_files=exhibit_files,
         )
 
     def process_dispute(

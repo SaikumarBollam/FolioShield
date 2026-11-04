@@ -55,6 +55,7 @@ class EmbeddedContext:
     scopes: List[str] = field(default_factory=list)
     view: str = "dashboard"
     branding_id: Optional[str] = None
+    theme: Dict[str, Any] = field(default_factory=dict)  # host theme (validated by embedded.theme.HostTheme)
     session_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     expires_at: Optional[int] = None
 
