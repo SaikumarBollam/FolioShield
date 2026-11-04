@@ -90,11 +90,11 @@ class Settings:
     def get_api_key_for_provider(self, provider: str) -> Optional[str]:
         p = provider.lower()
         if p in ("meta", "direct_meta", "direct meta api"):
-            return self.meta_api_key
+            return self.meta_api_key or os.getenv("META_API_KEY") or os.getenv("LLAMA_API_KEY") or os.getenv("META_LLAMA_API_KEY")
         elif p == "groq":
-            return self.groq_api_key
+            return self.groq_api_key or os.getenv("GROQ_API_KEY")
         elif p in ("fireworks", "firework ai", "fireworks ai"):
-            return self.fireworks_api_key
+            return self.fireworks_api_key or os.getenv("FIREWORKS_API_KEY") or os.getenv("FIREWORK_API_KEY")
         elif p == "together":
             return self.together_api_key
         elif p == "openrouter":

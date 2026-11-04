@@ -715,25 +715,28 @@ with st.sidebar:
     provider_label = st.selectbox("Inference Provider:", options=provider_labels, index=provider_labels.index(default_label))
     provider_code = PROVIDER_OPTIONS[provider_label]
 
-    api_key_input = ""
-    if provider_code != OFFLINE_PROVIDER:
-        env_var = PROVIDERS[provider_code].api_key_env
-        configured_key = config.get_api_key_for_provider(provider_code)
-        api_key_input = st.text_input(
-            "Provider API Key:",
-            value=configured_key or "",
-            type="password",
-            placeholder=f"Leave blank to use ${env_var}",
-            help="Keys can be set in .env or passed here for this session.",
-        )
+    env_vars = {
+        "meta": "META_API_KEY",
+        "groq": "GROQ_API_KEY",
+        "fireworks": "FIREWORKS_API_KEY",
+    }
+    prov_cfg = PROVIDERS.get(provider_code)
+    env_var = prov_cfg.api_key_env if prov_cfg else env_vars.get(provider_code, f"{provider_code.upper()}_API_KEY")
+    configured_key = config.get_api_key_for_provider(provider_code)
+
+    api_key_input = st.text_input(
+        f"{provider_label} API Key:",
+        value=configured_key or "",
+        type="password",
+        placeholder=f"Enter {provider_label} key or set ${env_var}",
+        help=f"API key can be set in .env (${env_var}) or entered here for this session.",
+    )
 
     llama_engine = LlamaEngine(provider=provider_code, api_key=api_key_input or None)
     if llama_engine.is_api_configured():
         st.success(f"🟢 {provider_label} connected")
-    elif provider_code == OFFLINE_PROVIDER:
-        st.info("🟡 Local processing enabled — documents are processed on this system")
     else:
-        st.warning("🟠 AI provider not configured — local processing will be used")
+        st.warning(f"🟠 {provider_label} key not configured — local fallback will be used")
 
     st.markdown("---")
     st.markdown("### 💾 **Saved Cases**")
