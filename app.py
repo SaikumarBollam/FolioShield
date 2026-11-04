@@ -88,6 +88,66 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+def get_shield_svg(size: int = 28) -> str:
+    """Renders the FolioShield brand shield matching the palette (Navy #173B50, Gold #D5B77A, Steel Blue #697B83)."""
+    return (
+        f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" '
+        f'xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; flex-shrink: 0;">'
+        f'<path d="M12 2L4 5.5V11.5C4 16.5 7.4 21.1 12 22.3C16.6 21.1 20 16.5 20 11.5V5.5L12 2Z" '
+        f'fill="#173B50" stroke="#D5B77A" stroke-width="1.8" stroke-linejoin="round"/>'
+        f'<path d="M12 2V22.3C16.6 21.1 20 16.5 20 11.5V5.5L12 2Z" fill="#697B83" fill-opacity="0.3"/>'
+        f'<path d="M8.5 12L11 14.5L16 9.5" stroke="#D5B77A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+        f'</svg>'
+    )
+
+
+def get_icon_svg(name: str, size: int = 20) -> str:
+    """Renders bespoke luxury monochrome SVG icons for section headings matching the theme."""
+    color = "var(--fs-gold)"
+    if name == "intake":
+        return (
+            f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" '
+            f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" '
+            f'style="vertical-align: text-bottom; margin-right: 6px;">'
+            f'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>'
+        )
+    if name == "library":
+        return (
+            f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" '
+            f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" '
+            f'style="vertical-align: text-bottom; margin-right: 6px;">'
+            f'<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>'
+        )
+    if name == "reviewer":
+        return (
+            f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" '
+            f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" '
+            f'style="vertical-align: text-bottom; margin-right: 6px;">'
+            f'<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/>'
+            f'<polyline points="17 11 19 13 23 9"/></svg>'
+        )
+    if name == "ai":
+        return (
+            f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" '
+            f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" '
+            f'style="vertical-align: text-bottom; margin-right: 6px;">'
+            f'<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/>'
+            f'<line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/>'
+            f'<line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/>'
+            f'<line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/>'
+            f'<line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>'
+        )
+    if name == "saved":
+        return (
+            f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" '
+            f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" '
+            f'style="vertical-align: text-bottom; margin-right: 6px;">'
+            f'<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>'
+            f'<path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>'
+        )
+    return ""
+
+
 def get_theme_css(dark_mode: bool = False) -> str:
     """Returns CSS block styled with the user palette (Navy, Muted Gold, Off-white, Steel Blue, Dark Charcoal)."""
     if dark_mode:
@@ -819,7 +879,15 @@ init_state()
 # SIDEBAR CONTROLS
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("## 🛡️ **FolioShield**")
+    _is_night = st.session_state.get("dark_mode", False)
+    _brand_color = "#D5B77A" if _is_night else "#173B50"
+    st.markdown(
+        f'<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 2px;">'
+        f'{get_shield_svg(32)}'
+        f'<span style="font-size: 1.55rem; font-weight: 700; color: {_brand_color}; letter-spacing: -0.015em;">FolioShield</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
     st.caption("**Hotel Chargeback Defense & Evidence Management**")
 
     # Dark / Light Mode Toggle
@@ -829,7 +897,7 @@ with st.sidebar:
     st.markdown("---")
 
     if config.enable_test_scenarios:
-        st.markdown("### 📚 **Reference Case Library**")
+        st.markdown(f"### {get_icon_svg('library')} **Reference Case Library**", unsafe_allow_html=True)
         selected_scenario = st.selectbox(
             "Open a reference case or start a new dispute:",
             options=list(SCENARIO_OPTIONS.keys()),
@@ -847,18 +915,18 @@ with st.sidebar:
                 log("reference_case_loaded", {"scenario": selected_scenario, "message": f"Opened reference case: {s_data['title']}"})
             st.rerun()
     else:
-        st.markdown("### 📂 **Document Intake**")
+        st.markdown(f"### {get_icon_svg('intake')} **Document Intake**", unsafe_allow_html=True)
         st.caption("Upload dispute notices and guest folios in Tab 1.")
 
     st.markdown("---")
-    st.markdown("### 👤 **Reviewer**")
+    st.markdown(f"### {get_icon_svg('reviewer')} **Reviewer**", unsafe_allow_html=True)
     st.text_input("Reviewer name (recorded in audit log):", key="reviewer_name", placeholder="Full name and title")
     st.selectbox("Reviewer role:", ["Manager", "Front Office Manager", "General Manager", "Revenue Manager", "Night Auditor", "Finance"], key="reviewer_role")
     merchant_name = st.text_input("Merchant / property name:", value=DEFAULT_MERCHANT,
                                   help="Used when the uploaded folio does not state the property name.")
 
     st.markdown("---")
-    st.markdown("### 🤖 **AI Processing**")
+    st.markdown(f"### {get_icon_svg('ai')} **AI Processing**", unsafe_allow_html=True)
     env_provider = config.llama_provider
     provider_labels = list(PROVIDER_OPTIONS)
     default_label = next((lbl for lbl, code in PROVIDER_OPTIONS.items() if code == env_provider), provider_labels[0])
@@ -889,7 +957,7 @@ with st.sidebar:
         st.warning(f"🟠 {provider_label} key not configured — local fallback will be used")
 
     st.markdown("---")
-    st.markdown("### 💾 **Saved Cases**")
+    st.markdown(f"### {get_icon_svg('saved')} **Saved Cases**", unsafe_allow_html=True)
     _store_for_list = _case_store()
     if _store_for_list is None:
         st.warning("Case database unavailable — work is kept in this session only and will be lost on restart.")
@@ -975,7 +1043,13 @@ def retained_exhibit_files() -> Dict[str, bytes]:
 # -----------------------------------------------------------------------------
 # MAIN HEADER & METRICS
 # -----------------------------------------------------------------------------
-st.markdown("<h1 class='main-header'>🛡️ FolioShield: Autonomous Chargeback Defense</h1>", unsafe_allow_html=True)
+st.markdown(
+    f'<div style="display: flex; align-items: center; gap: 14px; margin-bottom: 4px;">'
+    f'{get_shield_svg(38)}'
+    f'<h1 class="main-header" style="margin: 0; padding: 0; display: inline-block;">FolioShield: Autonomous Chargeback Defense</h1>'
+    f'</div>',
+    unsafe_allow_html=True,
+)
 st.markdown(
     "<p class='sub-header'>Outside-in document reconciliation, multimodal evidence auditing, "
     "and automated 3-page dispute packet generation powered by <b>Meta Llama 3.3 70B</b> &amp; <b>Llama Vision</b>.</p>",
