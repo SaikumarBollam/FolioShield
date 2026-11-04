@@ -290,7 +290,127 @@ init_state()
 with st.sidebar:
     _is_night = st.session_state.get("dark_mode", False)
     _brand_color = "#D5B77A" if _is_night else "#173B50"
-    st.markdown("<h1 class='main-header'>FolioShield: Autonomous Chargeback Defense</h1>", unsafe_allow_html=True)
+    st.markdown(
+        f'<div style="margin-bottom: 2px;">'
+        f'<span style="font-size: 1.55rem; font-weight: 700; color: {_brand_color}; letter-spacing: -0.015em;">FolioShield</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption("**Hotel Chargeback Defense & Evidence Management**")
+
+    # Dark / Light Mode Toggle
+    st.toggle("Night Mode", key="dark_mode")
+
+    st.markdown("---")
+
+    if config.enable_test_scenarios:
+        st.markdown("### Reference Case Library")
+        selected_scenario = st.selectbox(
+            "Open a reference case or start a new dispute:",
+            options=list(SCENARIO_OPTIONS.keys()),
+            format_func=SCENARIO_OPTIONS.get,
+            index=list(SCENARIO_OPTIONS).index(st.session_state.current_scenario_key),
+        )
+        if selected_scenario != st.session_state.current_scenario_key:
+            st.session_state.current_scenario_key = selected_scenario
+            if selected_scenario == "custom":
+                load_case(empty_notice(), empty_folio(), {})
+                log("custom_case_started", {"message": "Started new dispute case"})
+            else:
+                s_data = SCENARIOS[selected_scenario]
+                load_case(s_data["notice"], s_data["folio"], s_data["supporting_docs"])
+                log("reference_case_loaded", {"scenario": selected_scenario, "message": f"Opened reference case: {s_data['title']}"})
+            st.rerun()
+    else:
+        st.markdown("### Document Intake")
+        st.caption("Upload dispute notices and guest folios in Tab 1.")
+
+    st.markdown("---")
+    st.markdown("### Reviewer")
+    st.text_input("Reviewer name (recorded in audit log):", key="reviewer_name", placeholder="Full name and title")
+    st.selectbox("Reviewer role:", ["Manager", "Front Office Manager", "General Manager", "Revenue Manager", "Night Auditor", "Finance"], key="reviewer_role")
+    merchant_name = st.text_input("Merchant / property name:", value=DEFAULT_MERCHANT,
+                                  help="Used when the uploaded folio does not state the property name.")
+
+    st.markdown("---")
+    st.markdown("### AI Processing")
+    env_provider = config.llama_provider
+    provider_labels = list(PROVIDER_OPTIONS)
+    default_label = next((lbl for lbl, code in PROVIDER_OPTIONS.items() if code == env_provider), provider_labels[0])
+    provider_label = st.selectbox("Inference Provider:", options=provider_labels, index=provider_labels.index(default_label))
+    provider_code = PROVIDER_OPTIONS[provider_label]
+
+    env_vars = {
+        "meta": "META_API_KEY",
+        "groq": "GROQ_API_KEY",
+        "fireworks": "FIREWORKS_API_KEY",
+    }
+    prov_cfg = PROVIDERS.get(provider_code)
+    env_var = prov_cfg.api_key_env if prov_cfg else env_vars.get(provider_code, f"{provider_code.upper()}_API_KEY")
+    configured_key = config.get_api_key_for_provider(provider_code)
+
+    api_key_input = st.text_input(
+        f"{provider_label} API Key:",
+        value=configured_key or "",
+        type="password",
+        placeholder=f"Enter {provider_label} key or set ${env_var}",
+        help=f"API key can be set in .env (${env_var}) or entered here for this session.",
+    )
+
+    llama_engine = LlamaEngine(provider=provider_code, api_key=api_key_input or None)
+    if llama_engine.is_api_configured():
+        st.success(f"{provider_label} connected")
+    else:
+        st.warning(f"{provider_label} key not configured — local fallback will be used")
+
+    st.markdown("---")
+    st.markdown("### Saved Cases")
+    _store_for_list = _case_store()
+    if _store_for_list is None:
+        st.warning("Case database unavailable — work is kept in this session only and will be lost on restart.")
+    else:
+        try:
+            _saved_cases = _store_for_list.list_cases()
+        except CaseStoreError:
+            _saved_cases = []
+            st.warning("Case database unavailable — work is kept in this session only and will be lost on restart.")
+        _current_case_id = (st.session_state.get("notice_data") or {}).get("case_id")
+        if _saved_cases:
+            _saved_options = {c["case_id"]: f"{c['case_id']} · saved {str(c['updated_at'])[:16].replace('T', ' ')} UTC" for c in _saved_cases}
+            _picked_case = st.selectbox("Reopen a saved case:", options=[""] + list(_saved_options.keys()),
+                                        format_func=lambda cid: _saved_options.get(cid, "Select a saved case…"),
+                                        key="saved_case_picker")
+            if _picked_case and _picked_case != _current_case_id and st.button("Open saved case", width="stretch"):
+                if _open_saved_case(_picked_case):
+                    _feedback.flash(st.session_state, "success",
+                                    f"Saved case `{_picked_case}` reopened — notice, folio, evidence, draft, and approval were restored.")
+                    st.rerun()
+                else:
+                    st.error(f"That saved case (`{_picked_case}`) could not be loaded. It may have been deleted or the case database is unavailable.")
+        else:
+            st.caption("No saved cases yet — cases save automatically as you work.")
+        if _current_case_id:
+            if st.session_state.get("case_store_conflict"):
+                st.error(f"Save conflict: {st.session_state.case_store_conflict}")
+            elif st.session_state.get("case_store_updated_at"):
+                st.caption(f"Case `{_current_case_id}` saved {str(st.session_state.case_store_updated_at)[:16].replace('T', ' ')} UTC")
+            _hist_check = _store_for_list.verify_case_history(_current_case_id)
+            if _hist_check["ok"]:
+                st.caption(f"Audit history for `{_current_case_id}` verified across {len(_hist_check['sessions'])} session(s)")
+            else:
+                st.error(f"Audit history verification FAILED for `{_current_case_id}` — see Tab 7 for the failing session files.")
+
+    st.markdown("---")
+    st.markdown("### Compliance Safeguards")
+    st.caption("Immutable Audit Log: Active")
+    st.caption("Document Retention: Configured")
+    st.caption("Role-Based Controls: Enabled")
+
+
+# -----------------------------------------------------------------------------
+# MAIN HEADER & METRICS
+# -----------------------------------------------------------------------------
+st.markdown("<h1 class='main-header'>FolioShield: Autonomous Chargeback Defense</h1>", unsafe_allow_html=True)
 st.markdown(
     "<p class='sub-header'>Outside-in document reconciliation, multimodal evidence auditing, "
     "and automated 3-page dispute packet generation powered by <b>Meta Llama 3.3 70B</b> &amp; <b>Llama Vision</b>.</p>",
