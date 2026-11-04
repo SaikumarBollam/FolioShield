@@ -408,6 +408,39 @@ with st.sidebar:
 
 
 # -----------------------------------------------------------------------------
+# DERIVED CASE STATE (computed before rendering so metrics are never one click behind)
+# -----------------------------------------------------------------------------
+evidence_items = current_evidence_items()
+notice_data: Dict[str, Any] = st.session_state.notice_data
+folio_data: Dict[str, Any] = {**st.session_state.folio_data,
+                              "hotel_name": st.session_state.folio_data.get("hotel_name") or merchant_name}
+case_touched = _ui_state.is_case_touched(st.session_state)
+reconciliation = Reconciler.reconcile(notice_data, folio_data, evidence_items)
+collection_gaps: List[Dict[str, Any]] = reconciliation.get("collection_gaps") or []
+critical_gaps = [g for g in collection_gaps if g.get("severity") == "critical"]
+
+# Durable auto-save: persist whenever the case fingerprint changes (covers
+# form corrections, draft edits, checkbox attestations — not just uploads).
+try:
+    _fp_now = current_fingerprint_bundle()["fingerprint"]
+except Exception:
+    _fp_now = None
+if _fp_now and _fp_now != st.session_state.get("_last_persisted_fingerprint"):
+    _persist_case()
+    st.session_state._last_persisted_fingerprint = _fp_now
+
+
+def current_fingerprint() -> str:
+    return current_fingerprint_bundle()["fingerprint"]
+
+
+def retained_exhibit_files() -> Dict[str, bytes]:
+    """Exhibit letter -> retained bytes for exhibits whose files we still hold."""
+    return _ui_persistence.retained_exhibit_files(st.session_state, reconciliation)
+
+
+
+# -----------------------------------------------------------------------------
 # MAIN HEADER & METRICS
 # -----------------------------------------------------------------------------
 st.markdown("<h1 class='main-header'>FolioShield: Autonomous Chargeback Defense</h1>", unsafe_allow_html=True)
