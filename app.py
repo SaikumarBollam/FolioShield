@@ -42,10 +42,9 @@ logging.basicConfig(level=config.log_level, format="%(asctime)s %(levelname)s %(
 DEFAULT_MERCHANT = config.merchant_name
 CARD_NETWORKS = ["Visa", "Mastercard", "American Express", "Discover"]
 PROVIDER_OPTIONS = {
-    "Local Processing (No External AI)": OFFLINE_PROVIDER,
+    "Direct Meta API": "meta",
     "Groq": "groq",
-    "Together AI": "together",
-    "OpenRouter": "openrouter",
+    "Fireworks AI": "fireworks",
 }
 SCENARIO_OPTIONS = {
     "visa_fraud_10_4": "Visa 10.4 — Unauthorized Transaction Claim",

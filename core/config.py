@@ -68,6 +68,8 @@ class Settings:
     database_url: Optional[str] = None
     s3_endpoint_url: Optional[str] = None
     s3_bucket_name: Optional[str] = None
+    meta_api_key: Optional[str] = None
+    fireworks_api_key: Optional[str] = None
 
     @property
     def is_production(self) -> bool:
@@ -87,8 +89,12 @@ class Settings:
 
     def get_api_key_for_provider(self, provider: str) -> Optional[str]:
         p = provider.lower()
-        if p == "groq":
+        if p in ("meta", "direct_meta", "direct meta api"):
+            return self.meta_api_key
+        elif p == "groq":
             return self.groq_api_key
+        elif p in ("fireworks", "firework ai", "fireworks ai"):
+            return self.fireworks_api_key
         elif p == "together":
             return self.together_api_key
         elif p == "openrouter":
@@ -196,6 +202,8 @@ def get_settings(env_override: Optional[str] = None) -> Settings:
         database_url=os.getenv("DATABASE_URL") or None,
         s3_endpoint_url=os.getenv("S3_ENDPOINT_URL") or None,
         s3_bucket_name=os.getenv("S3_BUCKET_NAME") or None,
+        meta_api_key=os.getenv("META_API_KEY") or os.getenv("LLAMA_API_KEY") or None,
+        fireworks_api_key=os.getenv("FIREWORKS_API_KEY") or None,
     )
 
 

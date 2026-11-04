@@ -35,6 +35,12 @@ class ProviderConfig:
 
 
 PROVIDERS: Dict[str, ProviderConfig] = {
+    "meta": ProviderConfig(
+        url="https://api.llama-api.com/chat/completions",
+        api_key_env="META_API_KEY",
+        text_model="llama3.3-70b",
+        vision_model="llama3.2-11b-vision",
+    ),
     "groq": ProviderConfig(
         url="https://api.groq.com/openai/v1/chat/completions",
         api_key_env="GROQ_API_KEY",
@@ -42,6 +48,12 @@ PROVIDERS: Dict[str, ProviderConfig] = {
         # Groq retired its Llama 3.2 Vision previews; Llama 4 Scout is its current Meta Llama vision model.
         # Override with LLAMA_VISION_MODEL if your account still has a Llama 3.2 Vision deployment.
         vision_model="meta-llama/llama-4-scout-17b-16e-instruct",
+    ),
+    "fireworks": ProviderConfig(
+        url="https://api.fireworks.ai/inference/v1/chat/completions",
+        api_key_env="FIREWORKS_API_KEY",
+        text_model="accounts/fireworks/models/llama-v3p3-70b-instruct",
+        vision_model="accounts/fireworks/models/llama-v3p2-11b-vision-instruct",
     ),
     "together": ProviderConfig(
         url="https://api.together.xyz/v1/chat/completions",
