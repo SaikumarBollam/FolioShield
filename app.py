@@ -676,13 +676,7 @@ with st.sidebar:
         st.session_state.dark_mode = is_dark
         st.rerun()
 
-    # Environment Badge
-    if config.is_production:
-        st.markdown("<span class='badge' style='background-color:#DCFCE7; color:#15803D;'>🟢 PRODUCTION</span>", unsafe_allow_html=True)
-    elif config.is_testing:
-        st.markdown("<span class='badge' style='background-color:#FEF3C7; color:#B45309;'>🧪 TESTING</span>", unsafe_allow_html=True)
-    else:
-        st.markdown("<span class='badge' style='background-color:#E0E7FF; color:#4338CA;'>🛠️ DEVELOPMENT</span>", unsafe_allow_html=True)
+
     st.markdown("---")
 
     if config.enable_test_scenarios:
