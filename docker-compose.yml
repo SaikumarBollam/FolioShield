@@ -1,0 +1,35 @@
+# FolioShield local/self-hosted deployment.
+# Usage: cp .env.example .env (fill in secrets), then: docker compose up -d
+# Back up the folioshield-data volume: it holds cases.db, exhibits/,
+# integrations/registry.db (+ webhook_secret.key), and submissions/.
+services:
+  ui:
+    build: .
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: production
+    volumes:
+      - folioshield-data:/app/data
+      - folioshield-logs:/app/logs
+    restart: unless-stopped
+
+  api:
+    build: .
+    command: ["python", "-m", "core.api"]
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: production
+    volumes:
+      - folioshield-data:/app/data
+      - folioshield-logs:/app/logs
+    restart: unless-stopped
+
+volumes:
+  folioshield-data:
+  folioshield-logs:

@@ -44,7 +44,9 @@ def _load_key() -> bytes:
             return _cached_key
         from cryptography.fernet import Fernet
 
-        env_key = os.getenv("FOLIOSHIELD_WEBHOOK_SECRET_KEY", "").strip()
+        from ..config import config
+
+        env_key = (config.webhook_secret_key or "").strip()
         if env_key:
             _cached_key = env_key.encode("utf-8")
             return _cached_key

@@ -6,6 +6,25 @@
 - **Controlled integration testing:** API behind localhost or private network controls; test tenants and synthetic documents only.
 - **Production:** Requires TLS termination, network controls, secret management, monitored storage, backups, and customer security review.
 
+## Docker (Phase 3)
+
+```bash
+cp .env.example .env   # fill in secrets (FOLIOSHIELD_API_KEY, provider keys)
+docker compose up -d   # ui on :8501, api on :8000
+```
+
+- The image (`Dockerfile`, python:3.12-slim) runs as a non-root user; one
+  image serves both processes (`python -m core.api` overrides the UI command).
+- **Back up the `folioshield-data` volume** — it holds `cases.db` (case +
+  evidence metadata), `exhibits/` (retained evidence bytes),
+  `integrations/registry.db` plus `webhook_secret.key` (losing the key
+  makes stored webhook secrets unrecoverable; subscriptions must rotate),
+  and `submissions/` (submission/escalation/legal JSONL trails).
+- Set `FOLIOSHIELD_API_KEY` in `.env`: in production the legacy endpoints
+  fail closed (401) without it.
+- CI (`.github/workflows/tests.yml`) runs the full unittest suite on
+  Python 3.11 and 3.12 plus a bare-mode app smoke check.
+
 ## API server
 
 The built-in server now uses `ThreadingHTTPServer` for better local concurrency, but it remains a development/controlled-testing server. For production, place it behind a reviewed reverse proxy or replace only the serving layer while keeping `core.integrations` and the existing FolioShield engine.

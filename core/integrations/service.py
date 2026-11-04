@@ -128,6 +128,9 @@ class IntegrationService:
                                       supporting_docs=payload.get("supporting_docs"))
         payload["reconciliation"] = recon
         payload["status"] = "reconciled"
+        # Phase 3: cross-reference the engine audit session that produced
+        # this reconciliation, so the case's custody trail can be located.
+        payload["audit_session_id"] = self.engine.audit_logger.session_id
         saved = self.registry.upsert_case(context, IntegrationCaseRef.from_dict(record["case_ref"]), payload)
         self._emit(context, "reconciliation.completed", case_id, {"completeness_score": recon.get("completeness_score")})
         if recon.get("missing_evidence"):

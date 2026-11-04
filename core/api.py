@@ -38,6 +38,7 @@ from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
 from .client import FolioShield
+from .api_schemas import schema_for_integration, schema_for_legacy, validate_body
 from .config import config
 from .integrations.authentication import parse_bearer_token
 from .integrations.contracts import IntegrationCaseRef
@@ -48,12 +49,9 @@ from .integrations.webhooks import WebhookManager
 logger = logging.getLogger(__name__)
 fs = FolioShield()
 
-MAX_JSON_BODY_BYTES = int(os.getenv("FOLIOSHIELD_API_MAX_BODY_MB", "15")) * 1024 * 1024
-ALLOWED_ORIGINS = {
-    origin.strip() for origin in os.getenv("FOLIOSHIELD_API_CORS_ORIGINS", "http://localhost:8501,http://localhost:3000").split(",")
-    if origin.strip()
-}
-INTEGRATION_ROOT = os.getenv("FOLIOSHIELD_INTEGRATION_ROOT", "data/integrations")
+MAX_JSON_BODY_BYTES = config.api_max_body_mb * 1024 * 1024
+ALLOWED_ORIGINS = set(config.api_cors_origins)
+INTEGRATION_ROOT = config.integration_root
 HEALTH_PATHS = ("/health", "/api/v1/health")
 
 
@@ -299,6 +297,15 @@ class FolioShieldAPIHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/v1/integrations/"):
             if not self._check_rate_limit(request_id):
                 return
+            parts = [p for p in path.split("/") if p]
+            schema = schema_for_integration("POST", parts)
+            if schema is not None:
+                result = validate_body(body, schema)
+                if not result["ok"]:
+                    self._send_error("Request validation failed: "
+                                     + "; ".join(e["message"] for e in result["errors"]),
+                                     status=400, request_id=request_id, code="invalid_request")
+                    return
             self._handle_integration_post(path, body, request_id)
             return
 
@@ -306,6 +313,15 @@ class FolioShieldAPIHandler(BaseHTTPRequestHandler):
             return
         if not self._check_legacy_auth(request_id):
             return
+
+        schema = schema_for_legacy(path)
+        if schema is not None:
+            result = validate_body(body, schema)
+            if not result["ok"]:
+                self._send_error("Request validation failed: "
+                                 + "; ".join(e["message"] for e in result["errors"]),
+                                 status=400, request_id=request_id, code="invalid_request")
+                return
 
         try:
             if path == "/api/v1/reconcile":
@@ -545,10 +561,7 @@ def _start_webhook_resume_thread() -> None:
     Enabled when FOLIOSHIELD_WEBHOOK_RESUME_SECONDS > 0. Deliveries are
     tenant data; the loop uses the same registry/service stack as the API.
     """
-    try:
-        interval = int(os.getenv("FOLIOSHIELD_WEBHOOK_RESUME_SECONDS", "0"))
-    except ValueError:
-        interval = 0
+    interval = config.webhook_resume_seconds
     if interval <= 0:
         return
 
@@ -597,5 +610,4 @@ def run_api_server(port: int = 8000, host: Optional[str] = None):
 
 
 if __name__ == "__main__":
-    port = int(os.getenv("API_PORT", "8000"))
-    run_api_server(port=port)
+    run_api_server(port=config.api_port)

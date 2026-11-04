@@ -52,6 +52,15 @@ Primary staff interface in [`app.py`](app.py):
 6. Integration Management.
 7. Staff Activity & History.
 
+The testable UI logic (session state, evidence callbacks, persistence,
+theming) lives in the [`ui/`](ui/) package; `app.py` binds it to
+Streamlit. The API contract is published as OpenAPI 3.1 in
+[`docs/api/openapi.yaml`](docs/api/openapi.yaml) (generated from the
+enforced request schemas — regenerate with `python data/generate_openapi.py`).
+Docker deployment (`Dockerfile`, `docker-compose.yml`) and CI
+(Python 3.11/3.12) are included; see
+[Deployment](docs/integrations/deployment.md).
+
 ### 2. Python SDK
 
 Local/headless SDK in [`core/client.py`](core/client.py):
