@@ -77,7 +77,7 @@ class TestFolioShieldPipeline(unittest.TestCase):
     def test_05_pdf_and_csv_extraction(self):
         """Validates extraction of sample dispute notice and folio documents."""
         # 1. Parse sample notice PDF
-        notice_path = os.path.join("samples", "sample_dispute_notice_visa_10_4.pdf")
+        notice_path = os.path.join("test_artifacts", "manual_testing", "01_visa_10_4_false_fraud", "01_bank_dispute_notice.pdf")
         with open(notice_path, "rb") as f:
             pdf_bytes = f.read()
         extracted_text = DocumentExtractor.extract_text_from_pdf(pdf_bytes)
@@ -89,7 +89,7 @@ class TestFolioShieldPipeline(unittest.TestCase):
         self.assertEqual(parsed_notice["card_last_4"], "4821")
 
         # 2. Parse sample folio CSV
-        csv_path = os.path.join("samples", "sample_hotel_folio_john_davis.csv")
+        csv_path = os.path.join("test_artifacts", "manual_testing", "01_visa_10_4_false_fraud", "02_guest_folio.csv")
         with open(csv_path, "rb") as f:
             csv_bytes = f.read()
         parsed_folio = DocumentExtractor.parse_folio_csv(csv_bytes)

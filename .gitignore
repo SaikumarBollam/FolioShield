@@ -34,8 +34,7 @@ wheels/
 # Audit Logs & Output Packets
 logs/*.jsonl
 *.pdf
-!samples/*.pdf
-!FolioShield*workflow*.pdf
+!docs/architecture/workflow.pdf
 !test_artifacts/manual_testing/**/*.pdf
 
 # Runtime case data (submissions, exhibits, custody records)
@@ -48,13 +47,6 @@ data/cases.db-wal
 # Local integration runtime state (registries, demo credentials, agent queues)
 data/integrations/
 data/demo_integrations/
-
-# Node tooling manifests (not part of the Python app)
-package.json
-package-lock.json
-
-# Node (tooling only, not part of the Python app)
-node_modules/
 
 # IDE
 .vscode/

@@ -483,6 +483,13 @@ def main() -> None:
     (OUT_ROOT / "README.md").write_text("\n".join(readme), encoding="utf-8")
     print(f"Generated manual test artifacts in {OUT_ROOT}")
 
+    # Build the complete 20-slot evidence library as well
+    try:
+        from data.generate_complete_evidence_library import main as generate_library
+        generate_library()
+    except Exception as exc:
+        print(f"Notice: Complete evidence library generation skipped: {exc}")
+
 
 if __name__ == "__main__":
     main()
