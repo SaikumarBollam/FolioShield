@@ -227,8 +227,18 @@ class TestFolioShieldPipeline(unittest.TestCase):
         self.assertTrue(len(result.pdf_base64) > 1000)
 
     def test_13_api_server_handler_dispatch(self):
-        """Validates zero-dependency HTTP API request handler dispatch directly."""
+        """Validates zero-dependency HTTP API request handler dispatch directly.
+
+        Phase 1 P0: legacy endpoints are fail-closed when no API key is
+        configured in production; this dispatch test explicitly opts into
+        the documented local-development allowance.
+        """
+        import dataclasses
+        from unittest import mock
+
+        import core.api as api_module
         from core.api import FolioShieldAPIHandler
+        from core.config import config as app_config
         import io
         import json
 
@@ -263,7 +273,9 @@ class TestFolioShieldPipeline(unittest.TestCase):
         ).encode("utf-8")
 
         mock_sock = MockSocket(raw_http)
-        handler = FolioShieldAPIHandler(mock_sock, ("127.0.0.1", 12345), None)
+        open_cfg = dataclasses.replace(app_config, api_key=None, api_allow_legacy_unauthenticated=True)
+        with mock.patch.object(api_module, "config", open_cfg):
+            handler = FolioShieldAPIHandler(mock_sock, ("127.0.0.1", 12345), None)
         output_bytes = mock_sock.wfile.getvalue()
         self.assertIn(b"200 OK", output_bytes)
         self.assertIn(b'"status": "success"', output_bytes)

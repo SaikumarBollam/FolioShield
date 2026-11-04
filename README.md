@@ -63,10 +63,25 @@ Local/headless SDK in [`core/client.py`](core/client.py):
 
 REST API in [`core/api.py`](core/api.py):
 
-- Legacy dispute endpoints are preserved for backward compatibility.
+- Legacy dispute endpoints are preserved for backward compatibility and are
+  protected by a shared API key (`FOLIOSHIELD_API_KEY`) — fail-closed in
+  production, with per-client rate limiting. Machine processing never
+  records human approval: packets are drafts until an explicit,
+  fingerprint-bound approval is supplied (see the migration note in
+  [API Integration](docs/integrations/api_integration.md)).
 - Enterprise endpoints under `/api/v1/integrations/*` require Bearer integration credentials and are tenant-scoped.
 
 See [API Integration](docs/integrations/api_integration.md) for the endpoint inventory.
+
+### 4. Durable case & evidence storage
+
+- Cases (notice, folio, evidence metadata, draft, approval) persist in a
+  local SQLite database (`FOLIOSHIELD_CASE_DB`, default `data/cases.db`)
+  and can be reopened from the sidebar after a restart.
+- Evidence file bytes are retained in a content-addressed exhibit store
+  (`FOLIOSHIELD_EXHIBIT_DIR`, default `data/exhibits`) with atomic,
+  hash-verified writes and verified reads — corrupt files are quarantined
+  and honestly reported as not retained.
 
 ---
 

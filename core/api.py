@@ -5,6 +5,19 @@ The original dispute endpoints remain available for backward compatibility.
 Enterprise integration endpoints under /api/v1/integrations require Bearer
 API credentials issued through core.integrations and are tenant-scoped.
 
+Phase 1 (P0) endpoint protection:
+  * When FOLIOSHIELD_API_KEY is configured, every non-health endpoint
+    requires `Authorization: Bearer <key>` (constant-time comparison).
+    Integration endpoints keep their own tenant credentials, which also
+    satisfy this gate.
+  * When no key is configured, legacy endpoints are open only if
+    FOLIOSHIELD_API_ALLOW_LEGACY_UNAUTHENTICATED permits it (default:
+    allowed outside production, denied in production).
+  * Per-client rate limiting (FOLIOSHIELD_API_RATE_LIMIT_PER_MIN).
+  * /api/v1/packet/generate no longer stamps a caller-supplied approver:
+    packets are drafts unless a fingerprint-verified approval object is
+    supplied (see FolioShield.approve_dispute).
+
 Important deployment note: the built-in Python http.server implementation
 is suitable for local development and controlled integration testing. It is
 not, by itself, a production internet-facing server. Production deployments
@@ -13,9 +26,12 @@ or production server layer. See docs/integrations/deployment.md.
 """
 
 import base64
+import hmac
 import json
 import logging
 import os
+import threading
+import time
 import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from typing import Any, Dict, Optional
@@ -38,6 +54,37 @@ ALLOWED_ORIGINS = {
     if origin.strip()
 }
 INTEGRATION_ROOT = os.getenv("FOLIOSHIELD_INTEGRATION_ROOT", "data/integrations")
+HEALTH_PATHS = ("/health", "/api/v1/health")
+
+
+class _RateLimiter:
+    """Per-client token bucket (thread-safe, in-process)."""
+
+    def __init__(self, per_minute: int):
+        self.capacity = max(1, per_minute)
+        self._buckets: Dict[str, Any] = {}
+        self._lock = threading.Lock()
+
+    def allow(self, client: str) -> bool:
+        now = time.monotonic()
+        with self._lock:
+            tokens, updated = self._buckets.get(client, (float(self.capacity), now))
+            tokens = min(float(self.capacity), tokens + (now - updated) * (self.capacity / 60.0))
+            if tokens < 1.0:
+                self._buckets[client] = (tokens, now)
+                return False
+            self._buckets[client] = (tokens - 1.0, now)
+            return True
+
+
+_RATE_LIMITER = _RateLimiter(config.api_rate_limit_per_min)
+
+
+def _legacy_auth_required() -> bool:
+    """True when legacy endpoints must present the shared API key."""
+    if config.api_key:
+        return True
+    return not config.api_allow_legacy_unauthenticated
 
 
 def _integration_service() -> IntegrationService:
@@ -61,7 +108,8 @@ class FolioShieldAPIHandler(BaseHTTPRequestHandler):
             return origin
         return None
 
-    def _set_headers(self, status: int = 200, content_type: str = "application/json", request_id: Optional[str] = None):
+    def _set_headers(self, status: int = 200, content_type: str = "application/json", request_id: Optional[str] = None,
+                     extra_headers: Optional[Dict[str, str]] = None):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         origin = self._cors_origin()
@@ -73,6 +121,8 @@ class FolioShieldAPIHandler(BaseHTTPRequestHandler):
         self.send_header("X-Request-Id", request_id or self._request_id())
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Cache-Control", "no-store")
+        for name, value in (extra_headers or {}).items():
+            self.send_header(name, value)
         self.end_headers()
 
     def do_OPTIONS(self):
@@ -98,13 +148,49 @@ class FolioShieldAPIHandler(BaseHTTPRequestHandler):
             raise ValueError("JSON body must be an object")
         return parsed
 
-    def _send_json(self, data: Dict[str, Any], status: int = 200, request_id: Optional[str] = None):
-        self._set_headers(status, request_id=request_id)
+    def _send_json(self, data: Dict[str, Any], status: int = 200, request_id: Optional[str] = None,
+                   extra_headers: Optional[Dict[str, str]] = None):
+        self._set_headers(status, request_id=request_id, extra_headers=extra_headers)
         self.wfile.write(json.dumps(data, default=str).encode("utf-8"))
 
-    def _send_error(self, message: str, status: int = 400, request_id: Optional[str] = None, code: str = "bad_request"):
+    def _send_error(self, message: str, status: int = 400, request_id: Optional[str] = None, code: str = "bad_request",
+                    extra_headers: Optional[Dict[str, str]] = None):
         self._send_json({"status": "error", "error": {"code": code, "message": message},
-                         "request_id": request_id or self._request_id()}, status=status, request_id=request_id)
+                         "request_id": request_id or self._request_id()}, status=status, request_id=request_id,
+                        extra_headers=extra_headers)
+
+    # ------------------------------------------------------- Phase 1 P0 gates
+
+    def _check_rate_limit(self, request_id: str) -> bool:
+        """Returns True when the request may proceed; sends 429 otherwise."""
+        client = self.client_address[0] if self.client_address else "unknown"
+        if _RATE_LIMITER.allow(client):
+            return True
+        self._send_error("Rate limit exceeded — retry shortly", status=429, request_id=request_id,
+                         code="rate_limited", extra_headers={"Retry-After": "60"})
+        return False
+
+    def _check_legacy_auth(self, request_id: str) -> bool:
+        """Shared-key gate for legacy endpoints. Returns True to proceed.
+
+        Open only when no key is configured AND legacy unauthenticated
+        access is explicitly allowed (non-production default). Otherwise a
+        valid `Authorization: Bearer <FOLIOSHIELD_API_KEY>` is required.
+        """
+        if not _legacy_auth_required():
+            return True
+        if not config.api_key:
+            self._send_error(
+                "This API requires authentication but no FOLIOSHIELD_API_KEY is configured. "
+                "Set FOLIOSHIELD_API_KEY, or set FOLIOSHIELD_API_ALLOW_LEGACY_UNAUTHENTICATED=true "
+                "for local development only.",
+                status=401, request_id=request_id, code="unauthorized")
+            return False
+        token = parse_bearer_token(self.headers.get("Authorization"))
+        if token and hmac.compare_digest(token, config.api_key):
+            return True
+        self._send_error("Authentication required", status=401, request_id=request_id, code="unauthorized")
+        return False
 
     def _authenticate(self, request_id: str):
         token = parse_bearer_token(self.headers.get("Authorization"))
@@ -130,16 +216,26 @@ class FolioShieldAPIHandler(BaseHTTPRequestHandler):
         request_id = self._request_id()
         parsed = urlparse(self.path)
         path = parsed.path
-        if path in ("/health", "/api/v1/health"):
-            self._send_json({
+        if path in HEALTH_PATHS:
+            # Minimal unauthenticated liveness payload; operational details
+            # (environment, provider) are added only for callers presenting
+            # valid credentials. Health itself never returns 401.
+            payload: Dict[str, Any] = {
                 "status": "healthy",
                 "service": "FolioShield Dispute Defense Engine",
                 "version": "1.1.0",
-                "environment": config.environment,
-                "provider": fs.llama_engine.provider,
-                "api_configured": fs.llama_engine.is_api_configured(),
                 "request_id": request_id,
-            }, request_id=request_id)
+            }
+            token = parse_bearer_token(self.headers.get("Authorization"))
+            if token and config.api_key and hmac.compare_digest(token, config.api_key):
+                payload.update({
+                    "environment": config.environment,
+                    "provider": fs.llama_engine.provider,
+                    "api_configured": fs.llama_engine.is_api_configured(),
+                })
+            self._send_json(payload, request_id=request_id)
+            return
+        if not self._check_rate_limit(request_id):
             return
 
         if path.startswith("/api/v1/integrations/"):
@@ -201,7 +297,14 @@ class FolioShieldAPIHandler(BaseHTTPRequestHandler):
             return
 
         if path.startswith("/api/v1/integrations/"):
+            if not self._check_rate_limit(request_id):
+                return
             self._handle_integration_post(path, body, request_id)
+            return
+
+        if not self._check_rate_limit(request_id):
+            return
+        if not self._check_legacy_auth(request_id):
             return
 
         try:
@@ -229,18 +332,44 @@ class FolioShieldAPIHandler(BaseHTTPRequestHandler):
                 notice = body.get("notice", {})
                 folio = body.get("folio", {})
                 rebuttal_text = body.get("rebuttal_text", "")
-                approved_by = body.get("approved_by", "Hotel Operations Manager")
                 policy_text = body.get("policy_text")
                 docs = body.get("supporting_docs")
+                approval = body.get("approval")
 
                 recon = fs.reconcile(notice, folio, supporting_docs=docs)
-                pdf_bytes = fs.generate_pdf_packet(
-                    notice, folio, recon, rebuttal_text,
-                    approved_by=approved_by, policy_text=policy_text
-                )
+                # Phase 1 P0: a caller-supplied approver name is NOT approval.
+                # Packets are drafts unless a fingerprint-verified approval
+                # object (from FolioShield.approve_dispute) is supplied.
+                if approval:
+                    if not fs.verify_approval(notice, folio, docs, rebuttal_text, approval,
+                                              policy_text=policy_text):
+                        self._send_error(
+                            "Approval fingerprint does not match the current case and draft — "
+                            "the approval is stale or was not issued for this rebuttal. Re-approve first.",
+                            status=409, request_id=request_id, code="approval_stale")
+                        return
+                    pdf_bytes = fs.generate_pdf_packet_hashed(
+                        notice, folio, recon, rebuttal_text,
+                        approved_by=str(approval.get("approved_by") or ""),
+                        approved_at=str(approval.get("approved_at") or "") or None,
+                        policy_text=policy_text,
+                        approval_fingerprint=str(approval.get("fingerprint") or ""),
+                        chain_head=fs.audit_logger.chain_head,
+                    )
+                    approval_status = "approved"
+                else:
+                    pdf_bytes = fs.generate_pdf_packet_hashed(
+                        notice, folio, recon, rebuttal_text,
+                        approved_by=None, policy_text=policy_text,
+                        approval_fingerprint=None,
+                        chain_head=fs.audit_logger.chain_head,
+                    )
+                    approval_status = "draft_pending_human_approval"
                 digest = fs.audit_logger.calculate_sha256(pdf_bytes)
                 self._send_json({
                     "status": "success",
+                    "approval_status": approval_status,
+                    "human_approval_required": approval_status != "approved",
                     "sha256": digest,
                     "pdf_base64": base64.b64encode(pdf_bytes).decode("utf-8"),
                 }, request_id=request_id)
@@ -270,6 +399,20 @@ class FolioShieldAPIHandler(BaseHTTPRequestHandler):
             elif path == "/api/v1/submission/outcome":
                 saved = fs.record_outcome(body)
                 self._send_json({"status": "success", "data": saved.to_dict()}, request_id=request_id)
+
+            elif path == "/api/v1/dispute/approve":
+                # Explicit human approval (Phase 1 P0). The caller is a
+                # human-operated system; the approval is fingerprint-bound
+                # to the exact draft and recorded in the audit chain.
+                approval = fs.approve_dispute(
+                    body.get("notice", {}), body.get("folio", {}),
+                    supporting_docs=body.get("supporting_docs"),
+                    rebuttal_text=str(body.get("rebuttal_text") or ""),
+                    approved_by=str(body.get("approved_by") or ""),
+                    policy_text=body.get("policy_text"),
+                    custom_instructions=body.get("custom_notes"),
+                )
+                self._send_json({"status": "success", "data": approval}, request_id=request_id)
 
             elif path == "/api/v1/dispute/process":
                 notice_raw = body.get("notice", {})
@@ -396,13 +539,23 @@ class FolioShieldAPIHandler(BaseHTTPRequestHandler):
         logger.debug("%s - %s", self.address_string(), format % args)
 
 
-def run_api_server(port: int = 8000, host: str = "0.0.0.0"):
+def run_api_server(port: int = 8000, host: Optional[str] = None):
     """Starts the FolioShield REST API server.
 
     ThreadingHTTPServer improves local integration concurrency, but this is
     still not a complete production deployment. Terminate TLS and apply
     network controls in front of it for production use.
     """
+    host = host or config.api_host
+    if not config.api_key and not config.api_allow_legacy_unauthenticated:
+        logger.warning(
+            "FOLIOSHIELD_API_KEY is not set and legacy unauthenticated access is disabled: "
+            "legacy endpoints will return 401 until a key is configured.")
+    elif not config.api_key:
+        logger.warning(
+            "FOLIOSHIELD_API_KEY is not set: legacy endpoints are UNAUTHENTICATED "
+            "(allowed only because FOLIOSHIELD_API_ALLOW_LEGACY_UNAUTHENTICATED permits it). "
+            "Set FOLIOSHIELD_API_KEY before exposing this server beyond localhost.")
     server_address = (host, port)
     httpd = ThreadingHTTPServer(server_address, FolioShieldAPIHandler)
     print(f"FolioShield REST API listening on http://{host}:{port}")

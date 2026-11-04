@@ -171,17 +171,50 @@ class TestPhase5Custody(unittest.TestCase):
         self.assertIn("Packet SHA-256", text)
 
     def test_08_sdk_approval_parity(self):
+        """Phase 1 P0: headless processing must NOT record human approval.
+
+        process_dispute() performs machine processing only: it logs
+        api_rebuttal_processed, returns approval=None with
+        human_approval_required=True, and the packet is a draft. Approval
+        exists only after an explicit approve_dispute() call by a named
+        human, bound to the case fingerprint.
+        """
         fs = FolioShield()
         s = SCENARIOS["visa_fraud_10_4"]
         result = fs.process_dispute(
             notice=s["notice"], folio=s["folio"], supporting_docs=s["supporting_docs"],
             reviewer_name="SDK Test", generate_pdf=True)
         self.assertIsNotNone(result.pdf_base64)
+        self.assertIsNone(result.approval)
+        self.assertTrue(result.human_approval_required)
+        self.assertEqual(len(result.approval_fingerprint), 64)
         actions = [e["action"] for e in fs.audit_logger.events]
-        self.assertIn("api_rebuttal_approved", actions)
-        approval_evt = next(e for e in fs.audit_logger.events if e["action"] == "api_rebuttal_approved")
-        self.assertEqual(len(approval_evt["details"]["fingerprint"]), 64)
+        self.assertIn("api_rebuttal_processed", actions)
+        self.assertNotIn("api_rebuttal_approved", actions)
+        self.assertNotIn("rebuttal_approved", actions)
+
+        # Explicit human approval: fingerprint-bound and verifiable.
+        approval = fs.approve_dispute(
+            s["notice"], s["folio"], s["supporting_docs"], result.rebuttal_text,
+            approved_by="Test Manager")
+        self.assertEqual(approval["fingerprint"], result.approval_fingerprint)
+        self.assertEqual(approval["approved_by"], "Test Manager")
+        self.assertTrue(fs.verify_approval(
+            s["notice"], s["folio"], s["supporting_docs"], result.rebuttal_text, approval))
+        # A changed draft invalidates the approval.
+        self.assertFalse(fs.verify_approval(
+            s["notice"], s["folio"], s["supporting_docs"], result.rebuttal_text + " edited", approval))
+        actions = [e["action"] for e in fs.audit_logger.events]
+        self.assertIn("rebuttal_approved", actions)
         self.assertTrue(fs.audit_logger.verify_chain())
+
+    def test_09_approve_dispute_requires_human_and_draft(self):
+        fs = FolioShield()
+        s = SCENARIOS["visa_fraud_10_4"]
+        with self.assertRaises(ValueError):
+            fs.approve_dispute(s["notice"], s["folio"], s["supporting_docs"], "draft", approved_by="  ")
+        with self.assertRaises(ValueError):
+            fs.approve_dispute(s["notice"], s["folio"], s["supporting_docs"], "", approved_by="Manager")
 
 
 if __name__ == "__main__":

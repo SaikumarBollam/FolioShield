@@ -49,6 +49,13 @@ class Settings:
     log_dir: str
     log_level: str
     exhibit_store_dir: str
+    case_db_path: str
+
+    # API protection (Phase 1 P0)
+    api_key: Optional[str]
+    api_allow_legacy_unauthenticated: bool
+    api_rate_limit_per_min: int
+    api_host: str
 
     @property
     def is_production(self) -> bool:
@@ -122,6 +129,11 @@ def get_settings(env_override: Optional[str] = None) -> Settings:
     except ValueError:
         timeout_sec = 45
 
+    try:
+        api_rate_limit = max(1, int(os.getenv("FOLIOSHIELD_API_RATE_LIMIT_PER_MIN", "120")))
+    except ValueError:
+        api_rate_limit = 120
+
     return Settings(
         environment=env,
         llama_provider=provider,
@@ -140,6 +152,15 @@ def get_settings(env_override: Optional[str] = None) -> Settings:
         log_dir=os.getenv("LOG_DIR", "logs"),
         log_level=log_level,
         exhibit_store_dir=os.getenv("FOLIOSHIELD_EXHIBIT_DIR", "data/exhibits"),
+        case_db_path=os.getenv("FOLIOSHIELD_CASE_DB", "data/cases.db"),
+        api_key=os.getenv("FOLIOSHIELD_API_KEY") or None,
+        api_allow_legacy_unauthenticated=(
+            os.getenv("FOLIOSHIELD_API_ALLOW_LEGACY_UNAUTHENTICATED", "").strip().lower() in ("true", "1", "yes")
+            if os.getenv("FOLIOSHIELD_API_ALLOW_LEGACY_UNAUTHENTICATED") is not None
+            else env != "production"
+        ),
+        api_rate_limit_per_min=api_rate_limit,
+        api_host=os.getenv("FOLIOSHIELD_API_HOST", "0.0.0.0"),
     )
 
 

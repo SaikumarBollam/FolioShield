@@ -230,31 +230,33 @@ class FolioShield:
             "engine": self.llama_engine.last_engine_used
         }, user=reviewer_name)
 
-        # Approval parity (Phase 5): canonical fingerprint + approval event,
-        # so headless packets carry the same custody guarantees as the UI.
+        # Machine processing (Phase 1 P0): drafting is NOT human approval.
+        # No approval event is recorded here and the packet is a draft
+        # ("Pending approval") until a named human calls approve_dispute()
+        # and its fingerprint is supplied for the final packet.
         from .fingerprint import case_fingerprint as _case_fp
         fp = _case_fp(n_data.to_dict(), f_data.to_dict(),
                       recon.get("evidence_items") and {i["doc_type"]: i for i in recon["evidence_items"]} or {},
                       rebuttal, policy_text or "", custom_instructions or "", self.merchant_name or "")
-        approval_event = self.audit_logger.log_event("api_rebuttal_approved", {
+        self.audit_logger.log_event("api_rebuttal_processed", {
             "case_id": n_data.case_id,
             "fingerprint": fp["fingerprint"],
             "fingerprint_version": fp["version"],
             "rebuttal_sha256": AuditLogger.calculate_sha256(rebuttal.encode("utf-8")),
-            "gate_override": False,
+            "human_approval_required": True,
             "readiness_submittable": (recon.get("evidence_readiness") or {}).get("submittable"),
-            "message": "Headless approval recorded by SDK/API pipeline",
+            "message": "Headless machine processing completed by SDK/API pipeline; human approval still required",
         }, user=reviewer_name)
 
-        # Generate PDF if requested
+        # Generate PDF if requested (draft — no approval fingerprint embedded)
         pdf_b64 = None
         sha_digest = None
         if generate_pdf:
             pdf_bytes = self.generate_pdf_packet_hashed(
                 n_data, f_data, recon, rebuttal,
-                approved_by=reviewer_name,
+                approved_by=None,
                 policy_text=policy_text,
-                approval_fingerprint=fp["fingerprint"],
+                approval_fingerprint=None,
                 chain_head=self.audit_logger.chain_head,
             )
             sha_digest = AuditLogger.calculate_sha256(pdf_bytes)
@@ -262,7 +264,7 @@ class FolioShield:
             self.audit_logger.log_event("api_packet_generated", {
                 "case_id": n_data.case_id,
                 "sha256": sha_digest,
-                "approval_event_hash": approval_event["event_hash"],
+                "approval_status": "draft_pending_human_approval",
             }, user=reviewer_name)
 
         return DisputePacketResponse(
@@ -276,8 +278,83 @@ class FolioShield:
             discrepancies=recon.get("discrepancies", []),
             audit_highlights=recon.get("audit_highlights", []),
             collection_gaps=recon.get("collection_gaps", []),
-            evidence_items=recon.get("evidence_items", [])
+            evidence_items=recon.get("evidence_items", []),
+            approval=None,
+            human_approval_required=True,
+            approval_fingerprint=fp["fingerprint"],
         )
+
+    def approve_dispute(
+        self,
+        notice: Union[NoticeData, Dict[str, Any]],
+        folio: Union[FolioData, Dict[str, Any]],
+        supporting_docs: Optional[Dict[str, bool]] = None,
+        rebuttal_text: str = "",
+        *,
+        approved_by: str,
+        policy_text: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Records an explicit human approval for a drafted rebuttal.
+
+        This is the ONLY SDK path that creates an approval. The caller (a
+        human-operated system) supplies the approver's name; the approval is
+        bound to the canonical case fingerprint computed from the exact
+        notice/folio/evidence/draft being approved. Returns
+        {approved_by, approved_at, fingerprint, fingerprint_version,
+        event_hash, rebuttal_sha256} for packet generation.
+        """
+        approver = (approved_by or "").strip()
+        if not approver:
+            raise ValueError("approved_by (the human approver's name) is required")
+        if not (rebuttal_text or "").strip():
+            raise ValueError("rebuttal_text is required — approve the actual draft text")
+        n_data = notice if isinstance(notice, NoticeData) else NoticeData.from_dict(notice)
+        f_data = folio if isinstance(folio, FolioData) else FolioData.from_dict(folio)
+        if not f_data.hotel_name:
+            f_data.hotel_name = self.merchant_name
+        recon = self.reconcile(n_data, f_data, supporting_docs=supporting_docs)
+        from .fingerprint import case_fingerprint as _case_fp
+        fp = _case_fp(n_data.to_dict(), f_data.to_dict(),
+                      recon.get("evidence_items") and {i["doc_type"]: i for i in recon["evidence_items"]} or {},
+                      rebuttal_text, policy_text or "", custom_instructions or "", self.merchant_name or "")
+        from datetime import datetime, timezone
+        approved_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        event = self.audit_logger.log_event("rebuttal_approved", {
+            "case_id": n_data.case_id,
+            "fingerprint": fp["fingerprint"],
+            "fingerprint_version": fp["version"],
+            "rebuttal_sha256": AuditLogger.calculate_sha256(rebuttal_text.encode("utf-8")),
+            "via": "sdk_explicit",
+            "gate_override": False,
+            "message": f"Rebuttal approved by {approver} via SDK (explicit human approval)",
+        }, user=approver)
+        return {
+            "approved_by": approver,
+            "approved_at": approved_at,
+            "fingerprint": fp["fingerprint"],
+            "fingerprint_version": fp["version"],
+            "event_hash": event["event_hash"],
+            "rebuttal_sha256": AuditLogger.calculate_sha256(rebuttal_text.encode("utf-8")),
+        }
+
+    def verify_approval(self, notice, folio, supporting_docs, rebuttal_text: str,
+                        approval: Optional[Dict[str, Any]], policy_text: Optional[str] = None,
+                        custom_instructions: Optional[str] = None) -> bool:
+        """True when `approval` exists and its fingerprint matches the current case+draft."""
+        if not approval or not approval.get("fingerprint"):
+            return False
+        n_data = notice if isinstance(notice, NoticeData) else NoticeData.from_dict(notice)
+        f_data = folio if isinstance(folio, FolioData) else FolioData.from_dict(folio)
+        if not f_data.hotel_name:
+            f_data.hotel_name = self.merchant_name
+        recon = self.reconcile(n_data, f_data, supporting_docs=supporting_docs)
+        from .fingerprint import case_fingerprint as _case_fp
+        fp = _case_fp(n_data.to_dict(), f_data.to_dict(),
+                      recon.get("evidence_items") and {i["doc_type"]: i for i in recon["evidence_items"]} or {},
+                      rebuttal_text, policy_text or "", custom_instructions or "", self.merchant_name or "")
+        return fp["fingerprint"] == approval.get("fingerprint")
 
     # ------------------------------------------------------------------ Phase 6
 

@@ -237,6 +237,12 @@ class DisputePacketResponse:
     audit_highlights: List[str] = field(default_factory=list)
     collection_gaps: List[Dict[str, Any]] = field(default_factory=list)
     evidence_items: List[Dict[str, Any]] = field(default_factory=list)
+    # Phase 1 P0 approval integrity: machine processing is never human
+    # approval. approval stays None until approve_dispute() is called by a
+    # named human; packets generated before that are drafts.
+    approval: Optional[Dict[str, Any]] = None
+    human_approval_required: bool = True
+    approval_fingerprint: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

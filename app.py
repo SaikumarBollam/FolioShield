@@ -23,7 +23,7 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from core.audit_logger import AuditLogger
-from core.exhibit_store import ExhibitStore
+from core.exhibit_store import ExhibitStore, ExhibitStoreError
 from core.extractor import DocumentExtractor, ExtractionError
 from core.llm_engine import OFFLINE_PROVIDER, PROVIDERS, LlamaEngine
 from core.models import EvidenceItem
@@ -32,6 +32,7 @@ from core.reconciler import Reconciler
 from core.rules import SUPPORTING_DOC_GROUPS, SUPPORTING_DOC_GUIDANCE, SUPPORTING_DOC_TYPES
 from core.security import validate_upload
 from core.zip_import import plan_zip_import
+from core.case_store import CaseStore, CaseStoreError, CaseConflictError
 from core.config import config
 from data.sample_scenarios import SCENARIOS
 
@@ -185,15 +186,24 @@ def _exhibit_store() -> ExhibitStore:
     """Session exhibit store backed by the persistent content-addressed root.
 
     Bytes survive session/server restarts (keyed by SHA-256 under
-    config.exhibit_store_dir). Falls back to in-memory if the directory
-    cannot be created (e.g. read-only deployment).
+    config.exhibit_store_dir). If the directory cannot be created, the app
+    falls back to in-memory storage ONLY outside production and flags it
+    via st.session_state.exhibit_store_degraded so the UI warns staff that
+    exhibits will not survive a restart. In production the error is raised.
     """
     store = st.session_state.get("exhibit_store")
     if store is None:
         try:
             store = ExhibitStore(root=config.exhibit_store_dir)
-        except OSError:
+            st.session_state.exhibit_store_degraded = False
+        except OSError as exc:
+            if config.is_production:
+                raise ExhibitStoreError(
+                    f"Exhibit store directory '{config.exhibit_store_dir}' is unavailable: {exc}. "
+                    "Fix FOLIOSHIELD_EXHIBIT_DIR permissions before collecting evidence."
+                ) from exc
             store = ExhibitStore()
+            st.session_state.exhibit_store_degraded = True
         st.session_state.exhibit_store = store
     return store
 
@@ -225,6 +235,7 @@ def _store_evidence_bytes(key: str, label: str, filename: str, data: bytes, via:
     st.session_state.evidence_items = stored_docs
     st.session_state.processed_uploads[f"evidence_{key}"] = digest
     _set_evidence_present(key, True)
+    _persist_case()
     log("evidence_file_collected", {"doc_type": key, "filename": filename, "sha256": digest,
                                     "size_bytes": stored["size_bytes"], "via": via,
                                     "message": f"{label} collected as evidence file"})
@@ -242,7 +253,7 @@ def _collect_evidence_file(key: str, label: str) -> None:
         return
     try:
         _store_evidence_bytes(key, label, ev_file.name, ev_bytes)
-    except ValueError as e:
+    except (ValueError, ExhibitStoreError) as e:
         st.session_state.processed_uploads.pop(f"evidence_{key}", None)
         st.session_state.evidence_upload_error = f"❌ {e}"
         return
@@ -278,7 +289,7 @@ def _import_evidence_zip() -> None:
             digest = _store_evidence_bytes(doc_type, label, entry["filename"], entry["data"], via=f"zip:{entry.get('via')}")
             imported.append({"doc_type": doc_type, "label": label, "filename": entry["filename"],
                              "via": entry.get("via"), "sha256": digest})
-        except ValueError as e:
+        except (ValueError, ExhibitStoreError) as e:
             failed.append({"filename": entry["filename"], "reason": str(e)})
     st.session_state.evidence_zip_report = {
         "archive": zip_file.name, "imported": imported, "failed": failed,
@@ -301,6 +312,7 @@ def _remove_evidence_file(key: str, label: str) -> None:
     _set_evidence_present(key, False)
     st.session_state.processed_uploads.pop(f"evidence_{key}", None)
     reset_outputs()
+    _persist_case()
     log("evidence_file_removed", {"doc_type": key, "message": f"{label} evidence file removed"})
 
 
@@ -370,6 +382,7 @@ def _run_vision_check(key: str, label: str) -> None:
     item["vision_check"] = check
     stored[key] = item
     st.session_state.evidence_items = stored
+    _persist_case()
     log("vision_check_completed", {"doc_type": key, **check,
                                    "message": f"Vision check completed for {label}"})
 
@@ -415,6 +428,81 @@ def current_evidence_items() -> Dict[str, Dict[str, Any]]:
             item["bytes_retained"] = store.has(item.get("stored_ref") or item.get("sha256"), item.get("filename") or "")
         items[key] = item
     return items
+
+
+# ---------------------------------------------------------------------------
+# Durable case persistence (Phase 1 P0): cases survive restarts/sessions.
+# ---------------------------------------------------------------------------
+
+def _case_store() -> Optional[CaseStore]:
+    """Session case store; None (with a degraded flag) when unavailable."""
+    store = st.session_state.get("case_store")
+    if store is None and not st.session_state.get("case_store_failed"):
+        try:
+            store = CaseStore(config.case_db_path)
+            st.session_state.case_store = store
+            st.session_state.case_store_degraded = False
+        except CaseStoreError:
+            st.session_state.case_store_failed = True
+            st.session_state.case_store_degraded = True
+    return store
+
+
+def _persist_case() -> None:
+    """Saves the current case (notice/folio/evidence/draft/approval) durably.
+
+    Called from mutation callbacks and once per run when the case
+    fingerprint changed. Conflicts are surfaced, never silently resolved.
+    """
+    store = _case_store()
+    case_id = (st.session_state.get("notice_data") or {}).get("case_id")
+    if store is None or not case_id:
+        return
+    try:
+        head = st.session_state.audit_logger.chain_head
+        saved = store.save_case(
+            case_id,
+            st.session_state.get("notice_data") or {},
+            st.session_state.get("folio_data") or {},
+            st.session_state.get("evidence_items") or {},
+            draft_text=st.session_state.get("rebuttal_editor") or None,
+            policy_text=st.session_state.get("policy_text") or None,
+            custom_notes=st.session_state.get("custom_notes") or None,
+            approval=st.session_state.get("approval"),
+            fingerprint=(st.session_state.get("approval") or {}).get("fingerprint"),
+            audit_session_id=head.get("session_id"),
+            audit_head_hash=head.get("head_hash"),
+            audit_event_count=head.get("event_count"),
+            status=(st.session_state.get("notice_data") or {}).get("dispute_stage") or None,
+            expected_updated_at=st.session_state.get("case_store_updated_at"),
+        )
+        st.session_state.case_store_updated_at = saved["updated_at"]
+        st.session_state.pop("case_store_conflict", None)
+    except CaseConflictError as exc:
+        st.session_state.case_store_conflict = str(exc)
+    except CaseStoreError as exc:
+        st.session_state.case_store_degraded = True
+        st.session_state.case_store_conflict = f"Case could not be saved durably: {exc}"
+
+
+def _open_saved_case(case_id: str) -> bool:
+    """Restores a saved case into session state. Returns False if missing."""
+    store = _case_store()
+    if store is None:
+        return False
+    record = store.load_case(case_id)
+    if record is None:
+        return False
+    load_case(record["notice"] or {}, record["folio"] or {}, record["evidence_items"] or {})
+    st.session_state.rebuttal_editor = record.get("draft_text") or ""
+    st.session_state.policy_text = record.get("policy_text") or ""
+    st.session_state.custom_notes = record.get("custom_notes") or ""
+    st.session_state.approval = record.get("approval")
+    st.session_state.case_store_updated_at = record.get("updated_at")
+    st.session_state.pop("case_store_conflict", None)
+    log("saved_case_opened", {"case_id": case_id,
+                              "message": f"Reopened saved case {case_id} (saved {record.get('updated_at')})"})
+    return True
 
 
 def case_fingerprint(notice: Dict[str, Any], folio: Dict[str, Any], evidence: Dict[str, Any], draft: str, policy: str) -> str:
@@ -528,6 +616,36 @@ with st.sidebar:
         st.warning("🟠 AI provider not configured — local processing will be used")
 
     st.markdown("---")
+    st.markdown("### 💾 **Saved Cases**")
+    _store_for_list = _case_store()
+    if _store_for_list is None:
+        st.warning("Case database unavailable — work is kept in this session only and will be lost on restart.")
+    else:
+        try:
+            _saved_cases = _store_for_list.list_cases()
+        except CaseStoreError:
+            _saved_cases = []
+            st.warning("Case database unavailable — work is kept in this session only and will be lost on restart.")
+        _current_case_id = (st.session_state.get("notice_data") or {}).get("case_id")
+        if _saved_cases:
+            _saved_options = {c["case_id"]: f"{c['case_id']} · saved {str(c['updated_at'])[:16].replace('T', ' ')} UTC" for c in _saved_cases}
+            _picked_case = st.selectbox("Reopen a saved case:", options=[""] + list(_saved_options.keys()),
+                                        format_func=lambda cid: _saved_options.get(cid, "Select a saved case…"),
+                                        key="saved_case_picker")
+            if _picked_case and _picked_case != _current_case_id and st.button("📂 Open saved case", width="stretch"):
+                if _open_saved_case(_picked_case):
+                    st.rerun()
+                else:
+                    st.error("That saved case could not be loaded.")
+        else:
+            st.caption("No saved cases yet — cases save automatically as you work.")
+        if _current_case_id:
+            if st.session_state.get("case_store_conflict"):
+                st.error(f"⚠️ Save conflict: {st.session_state.case_store_conflict}")
+            elif st.session_state.get("case_store_updated_at"):
+                st.caption(f"💾 Case `{_current_case_id}` saved {str(st.session_state.case_store_updated_at)[:16].replace('T', ' ')} UTC — it survives restarts.")
+
+    st.markdown("---")
     st.markdown("### 🔐 **Compliance Safeguards**")
     st.checkbox("PCI-DSS Card Masking (PAN Redaction)", value=True, disabled=True,
                 help="Always enforced: card numbers are masked at extraction time, before storage or display.")
@@ -544,6 +662,16 @@ folio_data: Dict[str, Any] = {**st.session_state.folio_data,
 reconciliation = Reconciler.reconcile(notice_data, folio_data, evidence_items)
 collection_gaps: List[Dict[str, Any]] = reconciliation.get("collection_gaps") or []
 critical_gaps = [g for g in collection_gaps if g.get("severity") == "critical"]
+
+# Durable auto-save: persist whenever the case fingerprint changes (covers
+# form corrections, draft edits, checkbox attestations — not just uploads).
+try:
+    _fp_now = current_fingerprint_bundle()["fingerprint"]
+except Exception:
+    _fp_now = None
+if _fp_now and _fp_now != st.session_state.get("_last_persisted_fingerprint"):
+    _persist_case()
+    st.session_state._last_persisted_fingerprint = _fp_now
 
 
 def current_fingerprint() -> str:
@@ -953,6 +1081,9 @@ with tab_audit:
     st.caption("Check only documents you actually have. **Attach the file** so it is hashed into the chain of custody — "
                "collected files score higher than attestations and are indexed as exhibits in the packet. "
                "For scans and PDFs, an optional **Vision check** under each exhibit reviews signature/legibility.")
+    if st.session_state.get("exhibit_store_degraded"):
+        st.warning("⚠️ **Exhibit storage is degraded**: the persistent exhibit directory is unavailable, so files are "
+                   "held in memory only and will NOT survive a restart. Fix `FOLIOSHIELD_EXHIBIT_DIR` before relying on collected exhibits.")
 
     with st.expander("📦 Bulk import — upload a ZIP of evidence files", expanded=False):
         st.caption(
@@ -1222,6 +1353,7 @@ with tab_rebuttal:
                 "readiness_score": reconciliation.get("completeness_score"),
                 "readiness_submittable": (reconciliation.get("evidence_readiness") or {}).get("submittable"),
                 "drafted_by": drafter_name or None,
+                "via": "streamlit_ui",
                 "message": "Rebuttal approved",
             }, user=actor())
             st.session_state.approval = {
@@ -1235,6 +1367,7 @@ with tab_rebuttal:
                 "event_hash": approval_event["event_hash"],
                 "drafted_by": drafter_name or None,
             }
+            _persist_case()
             st.rerun()
     with col_app2:
         if approval_current:
