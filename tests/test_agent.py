@@ -5,15 +5,13 @@ No network and no vendor systems are used. Communication is faked; SQL
 connector behavior is asserted to be explicitly not production-ready.
 """
 
-import base64
-import json
 import tempfile
 import unittest
 from pathlib import Path
 
 from agent.agent import ConnectorAgent
 from agent.config import AgentConfig, SourceConfig
-from agent.connectors import FilesystemConnector, SqlConnector, create_connector
+from agent.connectors import SqlConnector, create_connector
 from agent.queue import AgentQueue
 
 

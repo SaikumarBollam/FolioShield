@@ -1,7 +1,6 @@
 """Tests: fail-safe exhibit storage (atomic writes, verified reads, quarantine)."""
 
 import hashlib
-import os
 import tempfile
 import unittest
 from pathlib import Path

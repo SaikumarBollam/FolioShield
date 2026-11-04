@@ -19,6 +19,8 @@ class TestCentralizedConfig(unittest.TestCase):
             self.assertIsNone(cfg.webhook_secret_key)
             self.assertIsNone(cfg.audit_hmac_key)
             self.assertIsNone(cfg.api_key)
+            self.assertIsNone(cfg.database_url)
+            self.assertIsNone(cfg.s3_endpoint_url)
 
     def test_overrides(self):
         env = {
@@ -29,6 +31,9 @@ class TestCentralizedConfig(unittest.TestCase):
             "FOLIOSHIELD_WEBHOOK_SECRET_KEY": "test-key",
             "AUDIT_HMAC_KEY": "hmac-key",
             "FOLIOSHIELD_API_KEY": "api-key-123",
+            "DATABASE_URL": "postgresql://test:test@localhost:5432/test",
+            "S3_ENDPOINT_URL": "http://minio:9000",
+            "S3_BUCKET_NAME": "test-bucket",
         }
         with mock.patch.dict(os.environ, env, clear=True):
             cfg = get_settings()
@@ -40,6 +45,9 @@ class TestCentralizedConfig(unittest.TestCase):
             self.assertEqual(cfg.webhook_secret_key, "test-key")
             self.assertEqual(cfg.audit_hmac_key, "hmac-key")
             self.assertEqual(cfg.api_key, "api-key-123")
+            self.assertEqual(cfg.database_url, "postgresql://test:test@localhost:5432/test")
+            self.assertEqual(cfg.s3_endpoint_url, "http://minio:9000")
+            self.assertEqual(cfg.s3_bucket_name, "test-bucket")
 
     def test_malformed_values_fall_back(self):
         env = {"API_PORT": "not-a-port", "FOLIOSHIELD_API_MAX_BODY_MB": "huge",

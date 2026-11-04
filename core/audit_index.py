@@ -18,7 +18,6 @@ Scanning is bounded (file count + per-file lines) and results are cached
 by (path, mtime, size) so repeated UI renders stay cheap.
 """
 
-import json
 import os
 from typing import Any, Dict, List, Optional, Tuple
 

@@ -25,7 +25,7 @@ EXPOSE 8501 8000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/', timeout=4)" || exit 1
 
-# Default: the Streamlit UI. Override with `python -m core.api` for the API.
+# Default: the Streamlit UI. Override with `uvicorn core.api_asgi:app --host 0.0.0.0 --port 8000` for production ASGI.
 CMD ["python", "-m", "streamlit", "run", "app.py", \
      "--server.headless", "true", "--server.port", "8501", \
      "--server.address", "0.0.0.0", "--browser.gatherUsageStats", "false"]

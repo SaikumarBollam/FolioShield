@@ -178,14 +178,20 @@ class SubmissionRegistry:
         self.root = root
         os.makedirs(root, exist_ok=True)
 
-    def _path(self, case_id: str) -> str:
-        return os.path.join(self.root, f"{_safe(case_id or 'unknown')}.jsonl")
+    def _path(self, case_id: str, tenant_id: Optional[str] = None) -> str:
+        safe_case = _safe(case_id or 'unknown')
+        if tenant_id:
+            tdir = os.path.join(self.root, _safe(tenant_id))
+            os.makedirs(tdir, exist_ok=True)
+            return os.path.join(tdir, f"{safe_case}.jsonl")
+        return os.path.join(self.root, f"{safe_case}.jsonl")
 
-    def _append(self, case_id: str, kind: str, record: Dict[str, Any]) -> None:
+    def _append(self, case_id: str, kind: str, record: Dict[str, Any], tenant_id: Optional[str] = None) -> None:
         entry = {"kind": kind, "recorded_at": datetime.now(timezone.utc).isoformat(), "record": record}
-        append_jsonl(self._path(case_id), entry)
+        tid = tenant_id or record.get("tenant_id")
+        append_jsonl(self._path(case_id, tid), entry)
 
-    def load(self, case_id: str) -> Dict[str, Any]:
+    def load(self, case_id: str, tenant_id: Optional[str] = None) -> Dict[str, Any]:
         """Returns {submissions, outcomes, corrupt_lines}.
 
         corrupt_lines lists 1-based line numbers that could not be parsed
@@ -193,7 +199,12 @@ class SubmissionRegistry:
         dropped (Phase 2).
         """
         out: Dict[str, Any] = {"submissions": [], "outcomes": [], "corrupt_lines": []}
-        entries, corrupt = read_jsonl(self._path(case_id))
+        path = self._path(case_id, tenant_id)
+        if not os.path.exists(path) and tenant_id:
+            fallback = self._path(case_id, None)
+            if os.path.exists(fallback):
+                path = fallback
+        entries, corrupt = read_jsonl(path)
         for entry in entries:
             key = "submissions" if entry.get("kind") == "submission" else "outcomes"
             out[key].append(entry.get("record") or {})
@@ -217,10 +228,10 @@ class SubmissionRegistry:
         self._append(record.case_id or "unknown", "outcome", record.to_dict())
         return record
 
-    def decision_status(self, case_id: str, today: Optional[date] = None) -> Dict[str, Any]:
+    def decision_status(self, case_id: str, today: Optional[date] = None, tenant_id: Optional[str] = None) -> Dict[str, Any]:
         """Latest submission/outcome state + overdue-decision flag."""
         today = today or date.today()
-        data = self.load(case_id)
+        data = self.load(case_id, tenant_id=tenant_id)
         submissions = data["submissions"]
         outcomes = data["outcomes"]
         latest_sub = submissions[-1] if submissions else None

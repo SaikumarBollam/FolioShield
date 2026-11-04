@@ -611,9 +611,23 @@ class DocumentExtractor:
         folio["line_items"] = line_items
         if line_items:
             if folio["total_charges"] == 0.0:
-                folio["total_charges"] = round(sum(i["amount"] for i in line_items if i["type"] == "Charge"), 2)
+                total_c = 0.0
+                for it in line_items:
+                    if it.get("type") == "Charge":
+                        try:
+                            total_c += float(it.get("amount") or 0.0)
+                        except (ValueError, TypeError):
+                            pass
+                folio["total_charges"] = round(total_c, 2)
             if folio["total_payments"] == 0.0:
-                folio["total_payments"] = round(sum(i["amount"] for i in line_items if i["type"] == "Credit"), 2)
+                total_p = 0.0
+                for it in line_items:
+                    if it.get("type") == "Credit":
+                        try:
+                            total_p += float(it.get("amount") or 0.0)
+                        except (ValueError, TypeError):
+                            pass
+                folio["total_payments"] = round(total_p, 2)
             if folio["rate_per_night"] == 0.0:
                 room_rates = [i["amount"] for i in line_items if i.get("category") == "Room"]
                 if room_rates:

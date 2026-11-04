@@ -29,11 +29,10 @@ import base64
 import hmac
 import json
 import logging
-import os
 import threading
 import time
 import uuid
-from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
@@ -444,7 +443,7 @@ class FolioShieldAPIHandler(BaseHTTPRequestHandler):
                 policy_text = body.get("policy_text")
                 docs = body.get("supporting_docs")
 
-                result = fs.process_dispute(
+                packet_response = fs.process_dispute(
                     notice=notice_raw,
                     folio=folio_raw,
                     supporting_docs=docs,
@@ -453,7 +452,7 @@ class FolioShieldAPIHandler(BaseHTTPRequestHandler):
                     policy_text=policy_text,
                     generate_pdf=True
                 )
-                self._send_json({"status": "success", "data": result.to_dict()}, request_id=request_id)
+                self._send_json({"status": "success", "data": packet_response.to_dict()}, request_id=request_id)
 
             else:
                 self._send_error("Unknown API endpoint", status=404, request_id=request_id, code="not_found")

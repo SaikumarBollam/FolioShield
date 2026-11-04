@@ -77,11 +77,13 @@ class DocumentSubmission:
     source: str = "api"
     external_reference: Optional[str] = None
     evidence_doc_type: Optional[str] = None
+    stored_ref: Optional[str] = None
 
     @classmethod
     def for_bytes(cls, document_type: str, filename: str, media_type: str, data: bytes,
                   source: str = "api", external_reference: Optional[str] = None,
-                  evidence_doc_type: Optional[str] = None) -> "DocumentSubmission":
+                  evidence_doc_type: Optional[str] = None,
+                  stored_ref: Optional[str] = None) -> "DocumentSubmission":
         return cls(
             document_type=document_type,
             filename=filename,
@@ -91,6 +93,7 @@ class DocumentSubmission:
             source=source,
             external_reference=external_reference,
             evidence_doc_type=evidence_doc_type,
+            stored_ref=stored_ref,
         )
 
     def to_dict(self) -> Dict[str, Any]:

@@ -20,7 +20,7 @@ blocks approval on unresolved markers).
 """
 
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 SECTION_PATTERNS = {
     "executive_summary": re.compile(r"executive summary", re.I),
@@ -41,7 +41,7 @@ _ASSERTION_PATTERNS = [
 ]
 
 
-def validate_rebuttal(text: str, recon: Dict[str, Any], notice: Dict[str, Any] = None) -> Dict[str, Any]:
+def validate_rebuttal(text: str, recon: Dict[str, Any], notice: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     notice = notice or {}
     issues: List[str] = []
     body = text or ""

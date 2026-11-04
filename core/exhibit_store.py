@@ -6,8 +6,9 @@ bundled and submitted — previously the UI hashed uploads and discarded the
 bytes, making attachment impossible.
 
 Storage is content-addressed: files are keyed by their SHA-256 and written
-under `<root>/<sha256[:2]>/<sha256><ext>` when a root directory is given.
-The store also works purely in memory (root=None) for tests/headless use.
+under `<root>/<tenant_id>/<sha256[:2]>/<sha256><ext>` when a root directory is given.
+The store also works purely in memory (root=None) for tests/headless use,
+and supports pluggable StorageBackend implementations (Local, S3, Memory).
 EvidenceItem.stored_ref carries the SHA-256 key.
 
 Fail-safety guarantees (Phase 1 P0):
@@ -23,9 +24,14 @@ Fail-safety guarantees (Phase 1 P0):
 
 import hashlib
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
+
+from core.infrastructure.storage.base import StorageBackend
+
+_SAFE = re.compile(r"[^A-Za-z0-9._-]+")
 
 _MIME_BY_EXT = {
     ".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg",
@@ -50,20 +56,46 @@ def _sha256(data: bytes) -> str:
 class ExhibitStore:
     """Content-addressed retention for evidence file bytes."""
 
-    def __init__(self, root: Optional[str] = None):
+    def __init__(
+        self,
+        root: Optional[str] = None,
+        backend: Optional[StorageBackend] = None,
+    ) -> None:
         self.root = root
         self._memory: Dict[str, bytes] = {}
-        if root:
+        if backend is not None:
+            self.backend: Optional[StorageBackend] = backend
+        elif root is not None:
+            from core.infrastructure.storage.local import LocalStorageBackend
+            self.backend = LocalStorageBackend(root=root)
             os.makedirs(root, exist_ok=True)
+        else:
+            from core.infrastructure.storage.memory import MemoryStorageBackend
+            self.backend = MemoryStorageBackend()
 
-    def _path_for(self, sha256: str, filename: str) -> str:
+    def _path_for(self, sha256: str, filename: str, tenant_id: Optional[str] = None) -> str:
+        if not self.root:
+            return ""
         ext = os.path.splitext(filename or "")[1].lower()
-        return os.path.join(self.root, sha256[:2], f"{sha256}{ext}")  # type: ignore[arg-type]
+        if tenant_id:
+            safe_tid = _SAFE.sub("_", tenant_id)[:80]
+            return os.path.join(self.root, safe_tid, sha256[:2], f"{sha256}{ext}")
+        return os.path.join(self.root, sha256[:2], f"{sha256}{ext}")
 
-    def _find_on_disk(self, stored_ref: str, filename: str = "") -> Optional[str]:
-        """Locates the stored file for a ref (exact path, else shard scan)."""
+    def _find_on_disk(self, stored_ref: str, filename: str = "", tenant_id: Optional[str] = None) -> Optional[str]:
+        """Locates the stored file for a ref (exact path, else shard scan with tenant fallback)."""
         if not self.root:
             return None
+        if tenant_id:
+            path = self._path_for(stored_ref, filename, tenant_id)
+            if os.path.exists(path):
+                return path
+            safe_tid = _SAFE.sub("_", tenant_id)[:80]
+            shard = os.path.join(self.root, safe_tid, stored_ref[:2])
+            if os.path.isdir(shard):
+                for name in os.listdir(shard):
+                    if name.startswith(stored_ref) and ".tmp-" not in name:
+                        return os.path.join(shard, name)
         path = self._path_for(stored_ref, filename)
         if os.path.exists(path):
             return path
@@ -87,7 +119,7 @@ class ExhibitStore:
             except OSError:
                 pass
 
-    def put(self, data: bytes, filename: str) -> Dict[str, object]:
+    def put(self, data: bytes, filename: str, tenant_id: Optional[str] = None) -> Dict[str, object]:
         """Stores bytes; returns {sha256, size_bytes, mime, stored_ref}.
 
         With a root directory the write is atomic (temp + fsync + replace)
@@ -97,7 +129,7 @@ class ExhibitStore:
         """
         sha256 = _sha256(data)
         if self.root:
-            path = self._path_for(sha256, filename)
+            path = self._path_for(sha256, filename, tenant_id)
             if not os.path.exists(path):
                 shard = os.path.dirname(path)
                 tmp_path = os.path.join(shard, f"{sha256}.tmp-{uuid.uuid4().hex[:12]}")
@@ -128,6 +160,9 @@ class ExhibitStore:
                     raise ExhibitStoreError(
                         f"Stored exhibit '{filename}' failed its integrity check and was quarantined."
                     )
+        elif self.backend is not None:
+            self.backend.put(sha256, data, tenant_id=tenant_id)
+
         self._memory[sha256] = data
         return {
             "sha256": sha256,
@@ -136,7 +171,7 @@ class ExhibitStore:
             "stored_ref": sha256,
         }
 
-    def get(self, stored_ref: Optional[str], filename: str = "") -> Optional[bytes]:
+    def get(self, stored_ref: Optional[str], filename: str = "", tenant_id: Optional[str] = None) -> Optional[bytes]:
         """Returns retained bytes, or None when unavailable/corrupt.
 
         Bytes are hash-verified against stored_ref on every read. Corrupt
@@ -149,22 +184,29 @@ class ExhibitStore:
             if _sha256(cached) == stored_ref:
                 return cached
             del self._memory[stored_ref]  # memory copy corrupt; fall through to disk
-        path = self._find_on_disk(stored_ref, filename)
-        if path is None:
-            return None
-        try:
-            with open(path, "rb") as f:
-                data = f.read()
-        except OSError:
-            return None
-        if _sha256(data) != stored_ref:
-            self._quarantine(path, stored_ref)
-            return None
-        self._memory[stored_ref] = data
-        return data
+        if self.root:
+            path = self._find_on_disk(stored_ref, filename, tenant_id)
+            if path is None:
+                return None
+            try:
+                with open(path, "rb") as f:
+                    data = f.read()
+            except OSError:
+                return None
+            if _sha256(data) != stored_ref:
+                self._quarantine(path, stored_ref)
+                return None
+            self._memory[stored_ref] = data
+            return data
+        if self.backend is not None:
+            backend_data = self.backend.get(stored_ref, tenant_id=tenant_id)
+            if backend_data is not None and _sha256(backend_data) == stored_ref:
+                self._memory[stored_ref] = backend_data
+                return backend_data
+        return None
 
-    def has(self, stored_ref: Optional[str], filename: str = "") -> bool:
-        return self.get(stored_ref, filename) is not None
+    def has(self, stored_ref: Optional[str], filename: str = "", tenant_id: Optional[str] = None) -> bool:
+        return self.get(stored_ref, filename, tenant_id=tenant_id) is not None
 
     def verify_all(self, limit: int = 1000) -> Dict[str, object]:
         """Hashes stored files and reports integrity (bounded sweep).

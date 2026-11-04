@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 EMBEDDED_VIEWS = (
     "dashboard",

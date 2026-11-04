@@ -165,6 +165,7 @@ class IntegrationRegistry:
              case_id: Optional[str] = None, idempotency_key: Optional[str] = None,
              dedupe_key: Optional[str] = None) -> None:
         blob = json.dumps(payload, default=str)
+        args: tuple[Any, ...]
         if table == "tenants":
             sql = "INSERT OR REPLACE INTO tenants(tenant_id, payload) VALUES (?, ?)"
             args = (key, blob)
@@ -413,7 +414,7 @@ class IntegrationRegistry:
             key = f"{job.tenant_id}:{job.job_id}"
             self._put("jobs", key, job.to_dict(), tenant_id=job.tenant_id,
                       idempotency_key=job.idempotency_key)
-            return deepcopy(self._get("jobs", key))
+            return deepcopy(self._get("jobs", key) or {})
 
     def update_job(self, job: ProcessingJob) -> Dict[str, Any]:
         job.touch()
