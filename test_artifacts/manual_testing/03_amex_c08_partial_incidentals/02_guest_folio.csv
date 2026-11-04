@@ -1,6 +1,6 @@
-Date,Description,Charge,Credit,Reference,Category
-2026-10-02,Penthouse Suite Accommodations,425.0,0.0,RM-PH12,Room
-2026-10-03,Penthouse Suite Accommodations,425.0,0.0,RM-PH12,Room
-2026-10-03,Private Cabana Dining (Signed Slip #4102),185.0,0.0,POS-4102,Dining
-2026-10-03,Overnight Valet Parking,60.0,0.0,VAL-778,Valet
-2026-10-04,Amex Settlement (Auth: AX99214),0.0,1095.0,AUTH-AX99214,Payment
+Date,Description,Charge,Credit,Reference,Category,Disputed
+2026-10-02,Penthouse Suite Accommodations,425.0,0.0,RM-PH12,Room,
+2026-10-03,Penthouse Suite Accommodations,425.0,0.0,RM-PH12,Room,
+2026-10-03,Private Cabana Dining (Signed Slip #4102),185.0,0.0,POS-4102,Dining,true
+2026-10-03,Overnight Valet Parking,60.0,0.0,VAL-778,Valet,true
+2026-10-04,Amex Settlement (Auth: AX99214),0.0,1095.0,AUTH-AX99214,Payment,

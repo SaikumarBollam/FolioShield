@@ -97,7 +97,20 @@ Cardholder Statement: 'I did not authorize or participate in this lodging transa
             "booking_confirmation": {"present": True, "filename": "confirmation_email_GH-884120.eml", "sha256": "a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4", "source": "PMS confirmation", "verified_by": "A. Rivera", "details": {"recipient": "jonathan.davis@example.com", "sent_at": "2026-09-28 14:02 UTC"}},
             "guest_service_log": {"present": True, "filename": "service_log_oct10-13.pdf", "sha256": "b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4", "source": "OPERA service log", "verified_by": "A. Rivera", "details": {"unresolved_complaints": 0}},
             "pos_signed_slips": {"present": True, "filename": "pos_slip_9812.pdf", "sha256": "c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4", "source": "Ocean Grill POS", "verified_by": "A. Rivera"},
-            "wifi_usage_log": {"present": True, "filename": "wifi_log_room412.csv", "sha256": "d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5", "source": "Guest WiFi portal", "verified_by": "A. Rivera"}
+            "wifi_usage_log": {
+                "present": True,
+                "filename": "wifi_log_room412.csv",
+                "sha256": "d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5",
+                "source": "Guest WiFi portal",
+                "verified_by": "A. Rivera",
+                "details": {
+                    "entries": 8,
+                    "first_entry": "2026-10-10 15:30",
+                    "last_entry": "2026-10-13 10:30",
+                    "first_seen": "2026-10-10 15:30",
+                    "last_seen": "2026-10-13 10:30"
+                }
+            }
         }
     },
 
@@ -152,6 +165,7 @@ Cardholder Statement: 'I cancelled my hotel reservation and should not have been
             "booking_source": "Hotel Website",
             "stay_status": "cancelled",
             "rate_plan": "Advance Purchase - Non-Refundable",
+            "guest_email": "eleanor.vance@example.com",
             "cancellation_timestamp": "2026-09-28 11:42 AM",
             "cancellation_number": "CX-55210",
             "line_items": [
@@ -168,7 +182,7 @@ Cardholder Statement: 'I cancelled my hotel reservation and should not have been
             "cancellation_policy_acceptance": {"present": True, "filename": "booking_acceptance_GH-773100.pdf", "sha256": "2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e", "source": "Hotel website booking engine", "verified_by": "Front Office Manager", "details": {"accepted_at": "2026-09-20 09:14 UTC", "policy_text": "Advance Purchase: non-refundable, no changes."}},
             "keycard_lock_audit": False,
             "id_verification_log": True,
-            "booking_confirmation": {"present": True, "filename": "confirmation_email_GH-773100.eml", "sha256": "3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f", "source": "PMS confirmation", "verified_by": "Front Office Manager", "details": {"recipient": "eleanor.vance@example.com"}},
+            "booking_confirmation": {"present": True, "filename": "confirmation_email_GH-773100.eml", "sha256": "3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f", "source": "PMS confirmation", "verified_by": "Front Office Manager", "details": {"recipient": "eleanor.vance@example.com", "sent_at": "2026-09-20 09:15 UTC"}},
             "guest_communication_log": {"present": True, "filename": "guest_comms_vance.pdf", "sha256": "4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a", "source": "Reservations inbox", "verified_by": "Front Office Manager"},
             "guest_service_log": True
         }
@@ -222,7 +236,14 @@ Cardmember Remarks: 'I did not order or consume the restaurant dining room servi
             "confirmation_number": "GH-554200",
             "booking_channel": "direct_phone",
             "booking_source": "Reservations Desk",
+            "booking_date": "2026-09-25",
             "stay_status": "occupied",
+            "check_in_time": "4:05 PM",
+            "rate_plan": "Best Available Rate",
+            "guest_email": "marcus.sterling@example.com",
+            "avs_result": "Y - full match",
+            "cvv_result": "Match",
+            "entry_mode": "chip",
             "line_items": [
                 {"date": "2026-10-02", "description": "Penthouse Suite Accommodations", "amount": 425.00, "type": "Charge", "reference": "RM-PH12", "category": "Room", "disputed": False},
                 {"date": "2026-10-03", "description": "Penthouse Suite Accommodations", "amount": 425.00, "type": "Charge", "reference": "RM-PH12", "category": "Room", "disputed": False},
@@ -234,14 +255,14 @@ Cardmember Remarks: 'I did not order or consume the restaurant dining room servi
         },
         "supporting_docs": {
             "signed_registration_card": {"present": True, "filename": "reg_card_sterling_PH12.pdf", "sha256": "5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b", "source": "Front desk scan", "verified_by": "Night Auditor"},
-            "emv_terminal_receipt": True,
-            "avs_cvv_result": True,
-            "cancellation_policy_acceptance": True,
+            "emv_terminal_receipt": {"present": True, "filename": "emv_receipt_AX99214.pdf", "sha256": "8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5", "source": "Ingenico terminal T-07", "verified_by": "Night Auditor"},
+            "avs_cvv_result": {"present": True, "filename": "gateway_auth_AX99214.csv", "sha256": "9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6", "source": "Payment gateway", "verified_by": "Night Auditor", "details": {"avs_result": "Y", "cvv_result": "Match"}},
+            "cancellation_policy_acceptance": {"present": True, "filename": "booking_acceptance_GH-554200.pdf", "sha256": "0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7", "source": "Reservations Desk booking record", "verified_by": "Night Auditor", "details": {"accepted_at": "2026-09-25 10:14 UTC", "policy_text": "Free cancellation until 48 hours before arrival; thereafter first night + tax. Incidentals require a signed slip."}},
             "keycard_lock_audit": {"present": True, "filename": "saflok_audit_PH12.csv", "sha256": "6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c", "source": "Saflok lock export", "verified_by": "Night Auditor", "details": {"entries": 9, "first_entry": "2026-10-02 16:05", "last_entry": "2026-10-04 11:12"}},
-            "id_verification_log": True,
-            "booking_confirmation": True,
+            "id_verification_log": {"present": True, "filename": "id_verification_PH12.pdf", "sha256": "1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6", "source": "Front desk ID log", "verified_by": "Night Auditor", "details": {"id_type": "Driver license"}},
+            "booking_confirmation": {"present": True, "filename": "confirmation_email_GH-554200.eml", "sha256": "2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8", "source": "PMS confirmation", "verified_by": "Night Auditor", "details": {"recipient": "marcus.sterling@example.com", "sent_at": "2026-09-25 10:15 UTC"}},
             "pos_signed_slips": {"present": True, "filename": "pos_slips_4102_778.pdf", "sha256": "7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d", "source": "Cabana POS + valet desk", "verified_by": "Night Auditor", "details": {"slips": [{"reference": "POS-4102", "amount": 185.00}, {"reference": "VAL-778", "amount": 60.00}]}},
-            "guest_service_log": True
+            "guest_service_log": {"present": True, "filename": "service_log_oct02-04.pdf", "sha256": "3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8", "source": "OPERA service log", "verified_by": "Night Auditor", "details": {"unresolved_complaints": 0}}
         }
     },
 
@@ -295,6 +316,7 @@ Cardholder Statement: 'Virtual card was charged outside the agreed booking terms
             "booking_source": "Booking.com",
             "booking_date": "2026-10-02",
             "stay_status": "occupied",
+            "guest_email": "priya.nair@example.com",
             "payer_name": "Booking.com B.V.",
             "payer_relationship": "OTA virtual card",
             "entry_mode": "ecommerce",
@@ -310,8 +332,8 @@ Cardholder Statement: 'Virtual card was charged outside the agreed booking terms
         "supporting_docs": {
             "signed_registration_card": {"present": True, "filename": "reg_card_nair_517.pdf", "sha256": "8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e", "source": "Front desk scan", "verified_by": "A. Rivera"},
             "id_verification_log": True,
-            "keycard_lock_audit": True,
-            "booking_confirmation": {"present": True, "filename": "bookingcom_confirmation_BDC-4412098.pdf", "sha256": "9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f", "source": "Booking.com extranet", "verified_by": "A. Rivera", "details": {"recipient": "guest via Booking.com", "vcc_terms": "Single-use, stay dates only, max $540.00"}},
+            "keycard_lock_audit": {"present": True, "filename": "keycard_audit_nair_517.csv", "sha256": "7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f", "source": "VingCard lock export", "verified_by": "A. Rivera", "details": {"entries": 6, "first_entry": "2026-10-18 16:10", "last_entry": "2026-10-20 11:05"}},
+            "booking_confirmation": {"present": True, "filename": "bookingcom_confirmation_BDC-4412098.pdf", "sha256": "9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f", "source": "Booking.com extranet", "verified_by": "A. Rivera", "details": {"recipient": "priya.nair@example.com", "sent_at": "2026-10-02 11:30 UTC", "vcc_terms": "Single-use, stay dates only, max $540.00"}},
             "guest_service_log": True
         }
     },
@@ -366,6 +388,7 @@ Cardholder Statement: 'I cancelled within the free cancellation window and never
             "booking_source": "Hotel Website",
             "stay_status": "cancelled",
             "rate_plan": "Flexible - Free Cancellation 48h",
+            "guest_email": "tomas.herrera@example.com",
             "cancellation_timestamp": "2026-10-01 10:05 AM",
             "cancellation_number": "CX-66101",
             "refund_amount": 412.00,
@@ -380,7 +403,7 @@ Cardholder Statement: 'I cancelled within the free cancellation window and never
         },
         "supporting_docs": {
             "cancellation_policy_acceptance": {"present": True, "filename": "booking_acceptance_GH-661000.pdf", "sha256": "0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a", "source": "Hotel website booking engine", "verified_by": "Revenue Manager", "details": {"accepted_at": "2026-09-25 08:40 UTC", "policy_text": "Free cancellation until 48 hours before arrival."}},
-            "booking_confirmation": True,
+            "booking_confirmation": {"present": True, "filename": "confirmation_email_GH-661000.eml", "sha256": "3d4e5f6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6e", "source": "PMS confirmation", "verified_by": "Revenue Manager", "details": {"recipient": "tomas.herrera@example.com", "sent_at": "2026-09-25 08:45 UTC"}},
             "guest_communication_log": {"present": True, "filename": "guest_comms_herrera.pdf", "sha256": "1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b", "source": "Reservations inbox", "verified_by": "Revenue Manager"},
             "refund_credit_receipt": {"present": True, "filename": "refund_receipt_RF-884120-6610.pdf", "sha256": "2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c", "source": "Processor portal", "verified_by": "Revenue Manager", "details": {"amount": 412.00, "date": "2026-10-02"}}
         }
@@ -434,6 +457,7 @@ Cardholder Statement: 'I never authorized a $300 charge after I checked out.'"""
             "booking_channel": "direct_web",
             "booking_source": "Hotel Website",
             "stay_status": "occupied",
+            "guest_email": "grace.omalley@example.com",
             "entry_mode": "chip",
             "line_items": [
                 {"date": "2026-10-14", "description": "Room Accommodation - King", "amount": 290.00, "type": "Charge", "reference": "RM629", "category": "Room", "disputed": False},
@@ -448,7 +472,7 @@ Cardholder Statement: 'I never authorized a $300 charge after I checked out.'"""
         "supporting_docs": {
             "signed_registration_card": {"present": True, "filename": "reg_card_omalley_629.pdf", "sha256": "3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d", "source": "Front desk scan", "verified_by": "Front Office Manager", "details": {"damage_clause_signed": True}},
             "emv_terminal_receipt": True,
-            "keycard_lock_audit": True,
+            "keycard_lock_audit": {"present": True, "filename": "keycard_audit_omalley_629.csv", "sha256": "6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e", "source": "Onity lock export", "verified_by": "Front Office Manager", "details": {"entries": 11, "first_entry": "2026-10-14 15:45", "last_entry": "2026-10-16 10:30"}},
             "id_verification_log": True,
             "incident_damage_evidence": {"present": True, "filename": "incident_INC-2214_photos_report.pdf", "sha256": "4b5c6d7e8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a", "source": "Housekeeping incident report", "verified_by": "Front Office Manager", "details": {"photos": 6, "report_id": "INC-2214"}},
             "guest_communication_log": {"present": True, "filename": "guest_comms_omalley.pdf", "sha256": "5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a", "source": "Front desk email", "verified_by": "Front Office Manager"}

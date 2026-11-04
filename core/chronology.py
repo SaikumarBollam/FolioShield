@@ -93,7 +93,9 @@ def build_chronology(notice: Dict[str, Any], folio: Dict[str, Any],
     policy_details = policy_item.get("details") or {}
     if policy_details.get("accepted_at"):
         add(policy_details["accepted_at"], "Cancellation / no-show policy displayed and accepted by the guest", "Booking engine acceptance log")
-    elif policy_item.get("present"):
+    elif policy_item.get("present") and stay_status in ("cancelled", "no_show"):
+        # Only a cancelled/no-show defense rests on policy acceptance; for an
+        # occupied stay the acceptance timestamp is not a chronology anchor.
         missing.append("policy acceptance timestamp")
 
     conf_item = evidence.get("booking_confirmation") or {}

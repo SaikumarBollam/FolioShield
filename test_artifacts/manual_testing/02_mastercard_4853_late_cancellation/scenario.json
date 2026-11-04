@@ -41,6 +41,7 @@
     "booking_source": "Hotel Website",
     "stay_status": "cancelled",
     "rate_plan": "Advance Purchase - Non-Refundable",
+    "guest_email": "eleanor.vance@example.com",
     "cancellation_timestamp": "2026-09-28 11:42 AM",
     "cancellation_number": "CX-55210",
     "line_items": [
@@ -104,7 +105,8 @@
       "source": "PMS confirmation",
       "verified_by": "Front Office Manager",
       "details": {
-        "recipient": "eleanor.vance@example.com"
+        "recipient": "eleanor.vance@example.com",
+        "sent_at": "2026-09-20 09:15 UTC"
       }
     },
     "guest_communication_log": {
@@ -154,7 +156,8 @@
       "scenario_filename": "confirmation_email_GH-773100.eml",
       "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
       "details_to_enter": {
-        "recipient": "eleanor.vance@example.com"
+        "recipient": "eleanor.vance@example.com",
+        "sent_at": "2026-09-20 09:15 UTC"
       }
     },
     {

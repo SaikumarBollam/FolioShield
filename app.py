@@ -505,7 +505,7 @@ with m5:
               delta=("Overdue" if days < 0 else f"{days} day(s) left") if days is not None else "Not found",
               delta_color="inverse" if days is not None and days <= 5 else "off")
 
-if case_touched and collection_gaps:
+if case_touched and _ui_state.has_case_data(st.session_state) and collection_gaps:
     gap_preview = "; ".join(g["message"] for g in collection_gaps[:3])
     st.warning(f"📥 **Collection gaps ({len(collection_gaps)}):** {gap_preview}"
                + (" …resolve in Tab 1 / Tab 2 before approval." if len(collection_gaps) > 3 else ""))
@@ -724,8 +724,6 @@ with tab_ingest:
                 f_refund_ref = st.text_input("Refund date / reference", value=" ".join(filter(None, [raw_folio.get("refund_date") or "", raw_folio.get("refund_reference") or ""])))
                 f_cancel = st.text_input("Cancellation timestamp / number", value=" ".join(filter(None, [raw_folio.get("cancellation_timestamp") or "", raw_folio.get("cancellation_number") or ""])))
             if st.form_submit_button("Save corrections", type="primary"):
-                _ui_state.mark_case_touched(st.session_state)
-                case_touched = True
                 bad_last4 = [v for v in (n_last4, f_last4) if v and not (v.isdigit() and len(v) == 4)]
                 if bad_last4:
                     st.error("Card last 4 must be exactly four digits.")
@@ -762,6 +760,7 @@ with tab_ingest:
                     changed = [f"notice.{k}" for k, v in notice_updates.items() if clean(v) != notice_data.get(k)]
                     changed += [f"folio.{k}" for k, v in folio_updates.items() if clean(v) != raw_folio.get(k)]
                     if changed:
+                        _ui_state.mark_case_touched(st.session_state)
                         st.session_state.notice_data = {**notice_data, **{k: clean(v) for k, v in notice_updates.items()}}
                         st.session_state.folio_data = {**raw_folio, **{k: clean(v) for k, v in folio_updates.items()}}
                         reset_outputs()
@@ -772,7 +771,9 @@ with tab_ingest:
                     else:
                         st.info("No changes to save.")
 
-    if case_touched and collection_gaps:
+    if not _ui_state.has_case_data(st.session_state):
+        st.info("ℹ️ **No dispute notice or guest folio uploaded yet.** Upload the bank dispute notice and guest folio above to extract case data and check for collection gaps.")
+    elif case_touched and collection_gaps:
         st.markdown("#### 📥 Collection Gaps")
         for gap in collection_gaps:
             render = st.error if gap.get("severity") == "critical" else st.warning
@@ -804,7 +805,7 @@ with tab_audit:
         st.write(f"**Rulebook description:** {rule_info.get('description', 'Verify reason code requirements with your processor.')}")
         if notice_data.get("claim_statement"):
             st.info(f"**🗣️ Cardholder's actual claim:** “{notice_data['claim_statement']}”")
-        elif case_touched:
+        elif case_touched and _ui_state.has_case_data(st.session_state):
             st.warning("🗣️ **Cardholder claim statement not collected** — add it in Tab 1 so the rebuttal answers the guest's actual words.")
     with net_col2:
         st.info(f"**🏨 Hotel Defense Playbook (How to Win):**\n{rule_info.get('win_strategy', 'Provide proof of authorization and service delivery.')}")
@@ -812,7 +813,7 @@ with tab_audit:
 
     st.markdown("---")
     st.markdown("#### 1. Stay & Billing Match Highlights")
-    if case_touched:
+    if case_touched and _ui_state.has_case_data(st.session_state):
         for highlight in reconciliation["audit_highlights"]:
             st.success(f"✓ **{highlight}**")
         for disc in reconciliation["discrepancies"]:
@@ -1102,7 +1103,7 @@ with tab_rebuttal:
     gate_reasons += [f"Dispositive evidence missing: {label}" for label in missing_dispositive]
     if unresolved:
         gate_reasons.append(f"Draft contains {unresolved} unresolved [MISSING] marker(s) — resolve them or override with a reason")
-    if not case_touched and not draft_text.strip():
+    if (not case_touched or not _ui_state.has_case_data(st.session_state)) and not draft_text.strip():
         st.info("Upload a dispute notice and guest folio in **Tab 1**, collect evidence in **Tab 2**, and generate a draft above to evaluate submission readiness.")
     elif gate_reasons:
         for reason in gate_reasons:

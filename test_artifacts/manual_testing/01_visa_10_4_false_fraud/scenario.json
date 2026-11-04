@@ -238,7 +238,14 @@
       "filename": "wifi_log_room412.csv",
       "sha256": "d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5",
       "source": "Guest WiFi portal",
-      "verified_by": "A. Rivera"
+      "verified_by": "A. Rivera",
+      "details": {
+        "entries": 8,
+        "first_entry": "2026-10-10 15:30",
+        "last_entry": "2026-10-13 10:30",
+        "first_seen": "2026-10-10 15:30",
+        "last_seen": "2026-10-13 10:30"
+      }
     }
   },
   "generated_evidence": [
@@ -329,7 +336,13 @@
       "generated_file": "evidence/10_wifi_usage_log.csv",
       "scenario_filename": "wifi_log_room412.csv",
       "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-      "details_to_enter": {}
+      "details_to_enter": {
+        "entries": 8,
+        "first_entry": "2026-10-10 15:30",
+        "last_entry": "2026-10-13 10:30",
+        "first_seen": "2026-10-10 15:30",
+        "last_seen": "2026-10-13 10:30"
+      }
     }
   ],
   "guide": {

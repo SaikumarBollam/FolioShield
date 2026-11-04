@@ -40,6 +40,7 @@
     "booking_channel": "direct_web",
     "booking_source": "Hotel Website",
     "stay_status": "occupied",
+    "guest_email": "grace.omalley@example.com",
     "entry_mode": "chip",
     "line_items": [
       {
@@ -111,7 +112,18 @@
       }
     },
     "emv_terminal_receipt": true,
-    "keycard_lock_audit": true,
+    "keycard_lock_audit": {
+      "present": true,
+      "filename": "keycard_audit_omalley_629.csv",
+      "sha256": "6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e",
+      "source": "Onity lock export",
+      "verified_by": "Front Office Manager",
+      "details": {
+        "entries": 11,
+        "first_entry": "2026-10-14 15:45",
+        "last_entry": "2026-10-16 10:30"
+      }
+    },
     "id_verification_log": true,
     "incident_damage_evidence": {
       "present": true,
@@ -151,10 +163,14 @@
     },
     {
       "doc_type": "keycard_lock_audit",
-      "generated_file": "evidence/03_keycard_lock_audit.txt",
-      "scenario_filename": null,
+      "generated_file": "evidence/03_keycard_lock_audit.csv",
+      "scenario_filename": "keycard_audit_omalley_629.csv",
       "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
-      "details_to_enter": {}
+      "details_to_enter": {
+        "entries": 11,
+        "first_entry": "2026-10-14 15:45",
+        "last_entry": "2026-10-16 10:30"
+      }
     },
     {
       "doc_type": "id_verification_log",

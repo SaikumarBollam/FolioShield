@@ -85,11 +85,14 @@ def store_evidence_bytes(state: MutableMapping[str, Any], key: str, label: str, 
         verified_by=actor_fn(), verified_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         size_bytes=stored["size_bytes"], mime=stored["mime"], stored_ref=stored["stored_ref"],
     ).to_dict()
+    auto_details = DocumentExtractor.extract_evidence_details(key, filename, data)
     if previous.get("sha256") == digest:
         for preserved in ("details", "vision_check", "original_type", "original_location",
                           "extracted_by", "extracted_at", "extraction_method", "system_name"):
             if previous.get(preserved):
                 new_item[preserved] = previous[preserved]
+    if auto_details:
+        new_item["details"] = {**auto_details, **(new_item.get("details") or {})}
     stored_docs[key] = new_item
     state["evidence_items"] = stored_docs
     state["processed_uploads"][f"evidence_{key}"] = digest

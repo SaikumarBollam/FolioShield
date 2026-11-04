@@ -1,5 +1,5 @@
-Avs Cvv Result
-==============
+Booking Confirmation
+====================
 SYNTHETIC TEST EVIDENCE — generated for FolioShield manual testing.
 
 Hotel: Grand Horizon Resort & Suites
@@ -9,9 +9,10 @@ Folio: FOL-2026-5542
 Confirmation: GH-554200
 Room: Penthouse 12
 Stay: 2026-10-02 to 2026-10-04
-Document type: avs_cvv_result
-Source: Test fixture
-Verified by: Test fixture
+Document type: booking_confirmation
+Source: PMS confirmation
+Verified by: Night Auditor
 
 Details:
-- Present in scenario; no additional structured details supplied.
+- recipient: "marcus.sterling@example.com"
+- sent_at: "2026-09-25 10:15 UTC"

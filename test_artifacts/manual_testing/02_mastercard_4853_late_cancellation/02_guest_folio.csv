@@ -1,4 +1,4 @@
-Date,Description,Charge,Credit,Reference,Category
-2026-09-28,Guaranteed Room - Advance Purchase (Non-Refundable),600.0,0.0,RES-7731,Room
-2026-09-28,State & Tourism Lodging Tax (15.0%),90.0,0.0,TAX-LOD,Tax
-2026-09-28,Mastercard Settlement (Auth: MC77192),0.0,690.0,AUTH-MC77192,Payment
+Date,Description,Charge,Credit,Reference,Category,Disputed
+2026-09-28,Guaranteed Room - Advance Purchase (Non-Refundable),600.0,0.0,RES-7731,Room,
+2026-09-28,State & Tourism Lodging Tax (15.0%),90.0,0.0,TAX-LOD,Tax,
+2026-09-28,Mastercard Settlement (Auth: MC77192),0.0,690.0,AUTH-MC77192,Payment,
