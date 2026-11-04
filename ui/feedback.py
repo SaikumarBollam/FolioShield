@@ -59,7 +59,7 @@ def action_guard(state: MutableMapping[str, Any], action_label: str, st_module: 
         traceback.print_exc()
         state["last_action_error"] = {"action": action_label, "error": detail}
         st_module.error(
-            f"❌ **{action_label} failed.** {exc} "
+            f"**{action_label} failed.** {exc} "
             "Your case data is unchanged — correct the issue and try again. "
             "If this keeps happening, note the time and check the server log."
         )

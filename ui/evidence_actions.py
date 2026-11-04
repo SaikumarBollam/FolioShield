@@ -122,7 +122,7 @@ def collect_evidence_file(state: MutableMapping[str, Any], key: str, label: str,
                              log_fn=log_fn, persist_fn=persist_fn)
     except (ValueError, ExhibitStoreError) as e:
         state["processed_uploads"].pop(f"evidence_{key}", None)
-        state["evidence_upload_error"] = f"❌ {e}"
+        state["evidence_upload_error"] = f"{e}"
         return
     ui_state.reset_outputs(state)
 
