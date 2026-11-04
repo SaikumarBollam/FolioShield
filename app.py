@@ -113,10 +113,25 @@ def get_theme_css(dark_mode: bool = False) -> str:
         --fs-radius: 8px;
     }
 
-    /* Main Canvas Background */
+    /* Main Canvas & Shell */
     .stApp, [data-testid="stAppViewContainer"] {
         background-color: var(--fs-charcoal) !important;
         color: var(--fs-offwhite) !important;
+    }
+
+    /* Header Bar — seamless with canvas background */
+    header[data-testid="stHeader"] {
+        background-color: var(--fs-charcoal) !important;
+        border-bottom: 1px solid var(--fs-border) !important;
+    }
+    header[data-testid="stHeader"] svg,
+    header[data-testid="stHeader"] button,
+    header[data-testid="stHeader"] [data-testid="stToolbar"] {
+        color: var(--fs-offwhite) !important;
+        fill: var(--fs-offwhite) !important;
+    }
+    [data-testid="stDecoration"] {
+        display: none !important;
     }
 
     /* Headings — Night Mode (Crisp Off-white with Muted Gold accents) */
@@ -194,6 +209,11 @@ def get_theme_css(dark_mode: bool = False) -> str:
         color: var(--fs-gold) !important;
         font-weight: 700 !important;
     }
+    div[data-testid="stMetricDelta"] {
+        font-size: 0.8rem !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+    }
     div[data-testid="stExpander"] {
         border: 1px solid var(--fs-border) !important;
         border-radius: var(--fs-radius) !important;
@@ -206,6 +226,64 @@ def get_theme_css(dark_mode: bool = False) -> str:
         color: var(--fs-offwhite) !important;
         border-color: var(--fs-border) !important;
     }
+    div[data-baseweb="select"] > div {
+        background-color: #1A2126 !important;
+        border-color: var(--fs-border) !important;
+        color: var(--fs-offwhite) !important;
+    }
+    ul[data-baseweb="menu"], [data-baseweb="popover"] {
+        background-color: #1A2126 !important;
+        border: 1px solid var(--fs-border) !important;
+    }
+    li[data-baseweb="menu-item"] {
+        color: var(--fs-offwhite) !important;
+        background-color: #1A2126 !important;
+    }
+    li[data-baseweb="menu-item"]:hover {
+        background-color: #26333D !important;
+        color: var(--fs-gold) !important;
+    }
+
+    /* File Uploader in Night Mode */
+    [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] {
+        background-color: #1A2126 !important;
+        border: 2px dashed var(--fs-gold) !important;
+        border-radius: var(--fs-radius) !important;
+        color: var(--fs-offwhite) !important;
+        padding: 1.25rem !important;
+    }
+    [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"]:hover {
+        background-color: #222B31 !important;
+        border-color: #E2CCA0 !important;
+    }
+    [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] span,
+    [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] p,
+    [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] small,
+    [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] div {
+        color: var(--fs-offwhite) !important;
+    }
+    [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] button {
+        background-color: #22292E !important;
+        border: 1px solid var(--fs-gold) !important;
+        color: var(--fs-gold) !important;
+        border-radius: var(--fs-radius) !important;
+    }
+    [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] button:hover {
+        background-color: #2D373D !important;
+        color: #FFFFFF !important;
+    }
+
+    /* Callout & Alert Boxes */
+    div[data-testid="stAlert"] {
+        background-color: #1A2530 !important;
+        border: 1px solid var(--fs-gold) !important;
+        border-left: 4px solid var(--fs-gold) !important;
+        border-radius: var(--fs-radius) !important;
+        color: var(--fs-offwhite) !important;
+    }
+    div[data-testid="stAlert"] p, div[data-testid="stAlert"] span {
+        color: var(--fs-offwhite) !important;
+    }
 
     /* Tabs Styling (Night Mode) */
     .stTabs [data-baseweb="tab-list"] {
@@ -214,7 +292,8 @@ def get_theme_css(dark_mode: bool = False) -> str:
         border-bottom: 2px solid var(--fs-gold);
     }
     .stTabs [data-baseweb="tab"] {
-        padding: 10px 18px;
+        padding: 8px 14px;
+        font-size: 0.92rem;
         border-radius: var(--fs-radius) var(--fs-radius) 0px 0px;
         font-weight: 600;
         color: var(--fs-steelblue);
@@ -263,7 +342,6 @@ def get_theme_css(dark_mode: bool = False) -> str:
         background-color: var(--fs-card-bg) !important;
     }
     .stButton > button:not([kind="primary"]):hover {
-        background-color: #2D373D !important;
         border-color: var(--fs-gold) !important;
         color: var(--fs-gold) !important;
     }
@@ -278,6 +356,14 @@ def get_theme_css(dark_mode: bool = False) -> str:
         border-bottom: none !important;
         border-left: none !important;
         padding-left: 0 !important;
+    }
+
+    /* Toggle switch active state */
+    [data-testid="stToggle"] label > div[role="switch"][aria-checked="true"] {
+        background-color: var(--fs-gold) !important;
+    }
+    [data-testid="stToggle"] label > div[role="switch"][aria-checked="true"] > div {
+        background-color: var(--fs-navy) !important;
     }
 
     .fs-brand-logo { max-height: 44px; margin-bottom: 6px; }
@@ -307,6 +393,21 @@ def get_theme_css(dark_mode: bool = False) -> str:
     .stApp, [data-testid="stAppViewContainer"] {
         background-color: var(--fs-offwhite) !important;
         color: var(--fs-charcoal) !important;
+    }
+
+    /* Header Bar — Light Mode */
+    header[data-testid="stHeader"] {
+        background-color: var(--fs-offwhite) !important;
+        border-bottom: 1px solid #DCDCD4 !important;
+    }
+    header[data-testid="stHeader"] svg,
+    header[data-testid="stHeader"] button,
+    header[data-testid="stHeader"] [data-testid="stToolbar"] {
+        color: var(--fs-charcoal) !important;
+        fill: var(--fs-charcoal) !important;
+    }
+    [data-testid="stDecoration"] {
+        display: none !important;
     }
 
     /* Headings — Navy (#173B50) */
@@ -384,10 +485,52 @@ def get_theme_css(dark_mode: bool = False) -> str:
         color: var(--fs-navy) !important;
         font-weight: 700 !important;
     }
+    div[data-testid="stMetricDelta"] {
+        font-size: 0.8rem !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+    }
     div[data-testid="stExpander"] {
         border: 1px solid #DCDCD4 !important;
         border-radius: var(--fs-radius) !important;
         background-color: #FFFFFF !important;
+    }
+
+    /* File Uploader in Light Mode */
+    [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] {
+        background-color: #FFFFFF !important;
+        border: 2px dashed var(--fs-steelblue) !important;
+        border-radius: var(--fs-radius) !important;
+        color: var(--fs-charcoal) !important;
+        padding: 1.25rem !important;
+    }
+    [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"]:hover {
+        background-color: #FAF9F5 !important;
+        border-color: var(--fs-navy) !important;
+    }
+    [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] span,
+    [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] p,
+    [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] small,
+    [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] div {
+        color: var(--fs-charcoal) !important;
+    }
+    [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] button {
+        background-color: #FFFFFF !important;
+        border: 1px solid var(--fs-navy) !important;
+        color: var(--fs-navy) !important;
+        border-radius: var(--fs-radius) !important;
+    }
+
+    /* Callout & Alert Boxes */
+    div[data-testid="stAlert"] {
+        background-color: #F0F4F7 !important;
+        border: 1px solid var(--fs-steelblue) !important;
+        border-left: 4px solid var(--fs-navy) !important;
+        border-radius: var(--fs-radius) !important;
+        color: var(--fs-charcoal) !important;
+    }
+    div[data-testid="stAlert"] p, div[data-testid="stAlert"] span {
+        color: var(--fs-charcoal) !important;
     }
 
     /* Tabs Styling (Navy & Muted Gold) */
@@ -397,7 +540,8 @@ def get_theme_css(dark_mode: bool = False) -> str:
         border-bottom: 2px solid var(--fs-gold);
     }
     .stTabs [data-baseweb="tab"] {
-        padding: 10px 18px;
+        padding: 8px 14px;
+        font-size: 0.92rem;
         border-radius: var(--fs-radius) var(--fs-radius) 0px 0px;
         font-weight: 600;
         color: var(--fs-steelblue);
@@ -463,12 +607,21 @@ def get_theme_css(dark_mode: bool = False) -> str:
         padding-left: 0 !important;
     }
 
+    /* Toggle switch active state */
+    [data-testid="stToggle"] label > div[role="switch"][aria-checked="true"] {
+        background-color: var(--fs-gold) !important;
+    }
+    [data-testid="stToggle"] label > div[role="switch"][aria-checked="true"] > div {
+        background-color: var(--fs-navy) !important;
+    }
+
     .fs-brand-logo { max-height: 44px; margin-bottom: 6px; }
 </style>
 """
 
 
 # Apply dynamic theme based on session state toggle
+st.session_state.setdefault("dark_mode", False)
 st.markdown(get_theme_css(st.session_state.get("dark_mode", False)), unsafe_allow_html=True)
 
 
@@ -670,10 +823,7 @@ with st.sidebar:
     st.caption("**Hotel Chargeback Defense & Evidence Management**")
 
     # Dark / Light Mode Toggle
-    is_dark = st.toggle("🌙 Night Mode", value=st.session_state.get("dark_mode", False), key="dark_mode_toggle")
-    if is_dark != st.session_state.get("dark_mode", False):
-        st.session_state.dark_mode = is_dark
-        st.rerun()
+    st.toggle("🌙 Night Mode", key="dark_mode")
 
 
     st.markdown("---")
