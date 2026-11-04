@@ -394,11 +394,17 @@ with st.sidebar:
                 st.error(f"Save conflict: {st.session_state.case_store_conflict}")
             elif st.session_state.get("case_store_updated_at"):
                 st.caption(f"Case `{_current_case_id}` saved {str(st.session_state.case_store_updated_at)[:16].replace('T', ' ')} UTC")
-            _hist_check = _store_for_list.verify_case_history(_current_case_id)
-            if _hist_check["ok"]:
-                st.caption(f"Audit history for `{_current_case_id}` verified across {len(_hist_check['sessions'])} session(s)")
-            else:
-                st.error(f"Audit history verification FAILED for `{_current_case_id}` — see Tab 7 for the failing session files.")
+            try:
+                from core.audit_index import verify_case_history as _verify_saved_history
+
+                _hist_check = _verify_saved_history(_current_case_id, config.log_dir)
+                if _hist_check.get("sessions"):
+                    if _hist_check.get("ok"):
+                        st.caption(f"Audit history for `{_current_case_id}` verified across {len(_hist_check['sessions'])} session(s).")
+                    else:
+                        st.error(f"Audit history verification FAILED for `{_current_case_id}` — see Tab 7 for the failing session files.")
+            except Exception:
+                pass
 
     st.markdown("---")
     st.markdown("### Compliance Safeguards")
