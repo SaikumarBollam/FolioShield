@@ -65,9 +65,10 @@ class TestAsgiApi(unittest.TestCase):
                 "total_charges": 100.0,
             },
         }
-        resp = self.client.post("/api/v1/reconcile", json=payload)
-        self.assertEqual(resp.status_code, 401)
-        self.assertEqual(resp.json()["detail"]["code"], "unauthorized")
+        with mock.patch("core.api_asgi.config", _cfg(environment="production", api_allow_legacy_unauthenticated=False)):
+            resp = self.client.post("/api/v1/reconcile", json=payload)
+            self.assertEqual(resp.status_code, 401)
+            self.assertEqual(resp.json()["detail"]["code"], "unauthorized")
 
     def test_authenticated_endpoints_with_valid_key(self):
         payload = {
@@ -134,9 +135,21 @@ class TestAsgiApi(unittest.TestCase):
             self.assertIn("rebuttal_text", proc_data["data"])
 
     def test_wrong_key_rejected(self):
-        with mock.patch("core.api_asgi.config", _cfg(api_key="secret-test-key")):
+        payload = {
+            "notice": {
+                "case_id": "CB-TEST-001",
+                "card_network": "Visa",
+                "reason_code": "10.4",
+                "disputed_amount": 100.0,
+            },
+            "folio": {
+                "guest_name": "John Doe",
+                "total_charges": 100.0,
+            },
+        }
+        with mock.patch("core.api_asgi.config", _cfg(api_key="secret-test-key", api_allow_legacy_unauthenticated=False)):
             headers = {"Authorization": "Bearer wrong-key"}
-            resp = self.client.post("/api/v1/reconcile", json={}, headers=headers)
+            resp = self.client.post("/api/v1/reconcile", json=payload, headers=headers)
             self.assertEqual(resp.status_code, 403)
             self.assertEqual(resp.json()["detail"]["code"], "forbidden")
 

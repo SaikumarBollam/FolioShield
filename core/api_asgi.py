@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from sqlalchemy import text
-from core.api import _RateLimiter, _legacy_auth_required
+from core.api import _RateLimiter
 from core.api_schemas import schema_for_legacy, validate_body
 from core.application.dispute_service import DisputeService
 from core.audit_logger import AuditLogger
@@ -28,6 +28,12 @@ from core.integrations.contracts import IntegrationCaseRef
 from core.integrations.registry import IntegrationRegistry
 from core.integrations.service import IntegrationService
 from core.integrations.webhooks import WebhookManager
+
+
+def _legacy_auth_required() -> bool:
+    if config.api_key:
+        return True
+    return not config.api_allow_legacy_unauthenticated
 
 _rate_limiter = _RateLimiter(config.api_rate_limit_per_min)
 _fs = FolioShield()
