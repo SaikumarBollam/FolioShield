@@ -374,6 +374,39 @@ if collection_gaps:
 
 st.markdown("<br/>", unsafe_allow_html=True)
 
+# Embedded mode: only server-validated signed context is trusted. Raw query
+# parameters such as tenant/role are never used for authorization by themselves.
+embedded_context = None
+try:
+    from embedded.configuration import EmbeddedConfiguration
+    from embedded.context import validate_context_token
+
+    _embedded_cfg = EmbeddedConfiguration.from_env()
+    _embedded_token = st.query_params.get("fs_embed_token") if hasattr(st, "query_params") else None
+    if isinstance(_embedded_token, list):
+        _embedded_token = _embedded_token[0] if _embedded_token else None
+    if _embedded_cfg.enabled and _embedded_token:
+        embedded_context = validate_context_token(
+            _embedded_token, _embedded_cfg.signing_secret, issuer=_embedded_cfg.issuer,
+            audience=_embedded_cfg.audience, allowed_origins=_embedded_cfg.allowed_origins or None,
+            origin=st.query_params.get("fs_embed_origin") if hasattr(st, "query_params") else None)
+        st.info(
+            f"🔗 Embedded session validated for tenant `{embedded_context.tenant_id}` · "
+            f"user `{embedded_context.user_id}` · view `{_embedded_cfg.validate_view(embedded_context.view)}` · "
+            f"case `{embedded_context.case_id or 'not specified'}`. "
+            "Identity and permissions were verified server-side from a signed, short-lived context token."
+        )
+        log("embedded_session_validated", {"tenant_id": embedded_context.tenant_id,
+                                           "user_id": embedded_context.user_id,
+                                           "view": embedded_context.view,
+                                           "case_id": embedded_context.case_id,
+                                           "message": "Embedded context validated"})
+    elif _embedded_cfg.enabled and _embedded_token is None and st.query_params.get("fs_embed") == "1":
+        st.warning("Embedded mode is enabled, but no signed FolioShield context token was supplied. Browser-supplied tenant/role parameters are not trusted.")
+except Exception as embedded_error:
+    st.error(f"Embedded session rejected: {embedded_error}")
+    log("embedded_session_rejected", {"error": str(embedded_error), "message": "Embedded context validation failed"})
+
 tab_ingest, tab_audit, tab_rebuttal, tab_pdf, tab_legal, tab_logs = st.tabs([
     "📄 1. Upload Notice & Guest Folio",
     "🔍 2. Stay & Billing Verification",
