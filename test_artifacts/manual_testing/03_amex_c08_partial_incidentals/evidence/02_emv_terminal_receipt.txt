@@ -1,0 +1,17 @@
+Emv Terminal Receipt
+====================
+SYNTHETIC TEST EVIDENCE — generated for FolioShield manual testing.
+
+Hotel: Grand Horizon Resort & Suites
+Guest: Marcus Aurelius Sterling
+Case ID: AX-DISP-11928-C
+Folio: FOL-2026-5542
+Confirmation: GH-554200
+Room: Penthouse 12
+Stay: 2026-10-02 to 2026-10-04
+Document type: emv_terminal_receipt
+Source: Test fixture
+Verified by: Test fixture
+
+Details:
+- Present in scenario; no additional structured details supplied.

@@ -1,0 +1,11 @@
+Date,Description,Charge,Credit,Reference,Category
+2026-10-10,Room Accommodation - Deluxe King,320.0,0.0,RM412,Room
+2026-10-10,Occupancy & Resort Tax (14.5%),46.4,0.0,TAX-OCC,Tax
+2026-10-10,Resort Amenity Fee,40.0,0.0,RES-FEE,Resort Fee
+2026-10-11,Room Accommodation - Deluxe King,320.0,0.0,RM412,Room
+2026-10-11,Occupancy & Resort Tax (14.5%),46.4,0.0,TAX-OCC,Tax
+2026-10-11,Ocean Grill Dining (Signed Room Charge),87.7,0.0,POS-9812,Dining
+2026-10-12,Room Accommodation - Deluxe King,320.0,0.0,RM412,Room
+2026-10-12,Occupancy & Resort Tax (14.5%),46.4,0.0,TAX-OCC,Tax
+2026-10-12,Spa Cabana Refreshments,53.6,0.0,SPA-331,Spa
+2026-10-13,Visa Payment (Auth: AP98231),0.0,1280.5,AUTH-AP98231,Payment

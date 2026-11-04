@@ -1,0 +1,19 @@
+Guest Service Log
+=================
+SYNTHETIC TEST EVIDENCE — generated for FolioShield manual testing.
+
+Hotel: Grand Horizon Resort & Suites
+Guest: Priya Nair
+Case ID: V-DISP-90331-O
+Folio: FOL-2026-6107
+Confirmation: BDC-4412098
+Room: 517
+Stay: 2026-10-18 to 2026-10-20
+Document type: guest_service_log
+Source: Test fixture
+Verified by: Test fixture
+
+Details:
+- Present in scenario; no additional structured details supplied.
+
+Unresolved complaints: see details above. Test both 0 and a positive number to see validator behavior.

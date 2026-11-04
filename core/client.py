@@ -1,0 +1,383 @@
+"""
+FolioShield SDK / Library Integration Interface.
+Enables programmatic, headless integration directly inside backend hotel services,
+Property Management Systems (OPERA, Cloudbeds, Mews), and Building/Hotel Management Systems.
+"""
+
+import base64
+from typing import Dict, Any, Optional, Union
+from .models import NoticeData, FolioData, DisputePacketResponse, SubmissionRecord, OutcomeRecord
+from .extractor import DocumentExtractor
+from .reconciler import Reconciler
+from .llm_engine import LlamaEngine
+from .pdf_generator import EvidencePacketGenerator
+from .audit_logger import AuditLogger
+from .config import config, Settings
+
+
+class FolioShield:
+    """
+    High-level Python SDK client for FolioShield.
+    
+    Usage:
+        from core.client import FolioShield
+        
+        fs = FolioShield()
+        
+        # Ingest directly from PMS dictionary or objects:
+        result = fs.process_dispute(
+            notice_pdf_bytes=notice_bytes,
+            folio=folio_dict_or_object,
+            reviewer_name="Night Auditor John",
+            generate_pdf=True
+        )
+        print(result.rebuttal_text)
+        print(result.completeness_score)
+    """
+
+    def __init__(
+        self,
+        provider: Optional[str] = None,
+        api_key: Optional[str] = None,
+        merchant_name: Optional[str] = None,
+        settings: Optional[Settings] = None
+    ):
+        self.settings = settings or config
+        self.merchant_name = merchant_name or self.settings.merchant_name
+        self.llama_engine = LlamaEngine(
+            provider=provider or self.settings.llama_provider,
+            api_key=api_key or self.settings.get_api_key_for_provider(provider or self.settings.llama_provider)
+        )
+        self.audit_logger = AuditLogger(log_dir=self.settings.log_dir)
+
+    def extract_notice_from_pdf(self, pdf_bytes: bytes) -> NoticeData:
+        """Extracts structured notice data from raw PDF bytes."""
+        raw_text = DocumentExtractor.extract_text_from_pdf(pdf_bytes)
+        parsed = DocumentExtractor.parse_dispute_notice(raw_text)
+        return NoticeData.from_dict(parsed)
+
+    def extract_notice_with_ocr(self, pdf_bytes: bytes) -> NoticeData:
+        """
+        Extracts notice data, using the vision model as an OCR fallback for
+        scanned / image-only notices. Raises ExtractionError if both fail.
+        """
+        raw_text = DocumentExtractor.extract_text_with_ocr_fallback(
+            pdf_bytes, ocr_text_provider=self.llama_engine.extract_text_from_image
+        )
+        parsed = DocumentExtractor.parse_dispute_notice(raw_text)
+        return NoticeData.from_dict(parsed)
+
+    def extract_folio_from_pdf(self, pdf_bytes: bytes) -> FolioData:
+        """Extracts structured folio data from raw PDF bytes."""
+        raw_text = DocumentExtractor.extract_text_from_pdf(pdf_bytes)
+        parsed = DocumentExtractor.parse_folio_pdf(raw_text)
+        if not parsed.get("hotel_name"):
+            parsed["hotel_name"] = self.merchant_name
+        return FolioData.from_dict(parsed)
+
+    def extract_folio_from_csv(self, csv_bytes: bytes) -> FolioData:
+        """Extracts structured folio data from PMS CSV exports."""
+        parsed = DocumentExtractor.parse_folio_csv(csv_bytes)
+        if not parsed.get("hotel_name"):
+            parsed["hotel_name"] = self.merchant_name
+        return FolioData.from_dict(parsed)
+
+    def reconcile(
+        self,
+        notice: Union[NoticeData, Dict[str, Any]],
+        folio: Union[FolioData, Dict[str, Any]],
+        supporting_docs: Optional[Dict[str, bool]] = None
+    ) -> Dict[str, Any]:
+        """Cross-checks dispute against guest folio and evidence checklist."""
+        n_dict = notice.to_dict() if isinstance(notice, NoticeData) else notice
+        f_dict = folio.to_dict() if isinstance(folio, FolioData) else folio
+        if not f_dict.get("hotel_name"):
+            f_dict["hotel_name"] = self.merchant_name
+        return Reconciler.reconcile(n_dict, f_dict, supporting_docs=supporting_docs)
+
+    def draft_rebuttal(
+        self,
+        notice: Union[NoticeData, Dict[str, Any]],
+        folio: Union[FolioData, Dict[str, Any]],
+        reconciliation: Dict[str, Any],
+        custom_instructions: Optional[str] = None
+    ) -> str:
+        """Drafts formal dispute rebuttal using Meta Llama or deterministic fallback."""
+        n_dict = notice.to_dict() if isinstance(notice, NoticeData) else notice
+        f_dict = folio.to_dict() if isinstance(folio, FolioData) else folio
+        return self.llama_engine.draft_rebuttal(
+            n_dict, f_dict, reconciliation, custom_instructions=custom_instructions
+        )
+
+    def generate_pdf_packet(
+        self,
+        notice: Union[NoticeData, Dict[str, Any]],
+        folio: Union[FolioData, Dict[str, Any]],
+        reconciliation: Dict[str, Any],
+        rebuttal_text: str,
+        approved_by: Optional[str] = "Hotel Management",
+        approved_at: Optional[str] = None,
+        policy_text: Optional[str] = None
+    ) -> bytes:
+        """Compiles the 3-page standardized dispute packet PDF bytes."""
+        n_dict = notice.to_dict() if isinstance(notice, NoticeData) else notice
+        f_dict = folio.to_dict() if isinstance(folio, FolioData) else folio
+        if not f_dict.get("hotel_name"):
+            f_dict["hotel_name"] = self.merchant_name
+        return EvidencePacketGenerator.generate_packet(
+            n_dict,
+            f_dict,
+            reconciliation,
+            rebuttal_text,
+            approved_by=approved_by,
+            approved_at=approved_at,
+            policy_text=policy_text
+        )
+
+    def generate_pdf_packet_hashed(
+        self,
+        notice: Union[NoticeData, Dict[str, Any]],
+        folio: Union[FolioData, Dict[str, Any]],
+        reconciliation: Dict[str, Any],
+        rebuttal_text: str,
+        approved_by: Optional[str] = "Hotel Management",
+        approved_at: Optional[str] = None,
+        policy_text: Optional[str] = None,
+        approval_fingerprint: Optional[str] = None,
+        chain_head: Optional[Dict[str, Any]] = None
+    ) -> bytes:
+        """
+        Two-pass packet build: pass 1 computes the packet SHA-256, pass 2
+        embeds it (plus approval fingerprint + chain head) in the p.3 custody
+        block so the downloaded file is self-verifying.
+        """
+        n_dict = notice.to_dict() if isinstance(notice, NoticeData) else notice
+        f_dict = folio.to_dict() if isinstance(folio, FolioData) else folio
+        if not f_dict.get("hotel_name"):
+            f_dict["hotel_name"] = self.merchant_name
+        first_pass = EvidencePacketGenerator.generate_packet(
+            n_dict, f_dict, reconciliation, rebuttal_text,
+            approved_by=approved_by, approved_at=approved_at, policy_text=policy_text,
+            approval_fingerprint=approval_fingerprint, chain_head=chain_head,
+        )
+        packet_hash = AuditLogger.calculate_sha256(first_pass)
+        return EvidencePacketGenerator.generate_packet(
+            n_dict, f_dict, reconciliation, rebuttal_text,
+            approved_by=approved_by, approved_at=approved_at, policy_text=policy_text,
+            approval_fingerprint=approval_fingerprint, chain_head=chain_head,
+            packet_sha256=packet_hash,
+        )
+
+    def process_dispute(
+        self,
+        notice: Union[NoticeData, Dict[str, Any], bytes],
+        folio: Union[FolioData, Dict[str, Any], bytes],
+        supporting_docs: Optional[Dict[str, bool]] = None,
+        custom_instructions: Optional[str] = None,
+        reviewer_name: str = "Automated PMS Connector",
+        generate_pdf: bool = True,
+        policy_text: Optional[str] = None
+    ) -> DisputePacketResponse:
+        """
+        Complete end-to-end processing pipeline suitable for headless PMS/BMS webhooks or jobs.
+        """
+        # Parse notice if raw bytes
+        if isinstance(notice, bytes):
+            n_data = self.extract_notice_from_pdf(notice)
+        elif isinstance(notice, NoticeData):
+            n_data = notice
+        else:
+            n_data = NoticeData.from_dict(notice)
+
+        # Parse folio if raw bytes
+        if isinstance(folio, bytes):
+            # Try PDF then fallback to CSV
+            try:
+                f_data = self.extract_folio_from_pdf(folio)
+            except Exception:
+                f_data = self.extract_folio_from_csv(folio)
+        elif isinstance(folio, FolioData):
+            f_data = folio
+        else:
+            f_data = FolioData.from_dict(folio)
+
+        if not f_data.hotel_name:
+            f_data.hotel_name = self.merchant_name
+
+        # Reconcile
+        recon = self.reconcile(n_data, f_data, supporting_docs=supporting_docs)
+        self.audit_logger.log_event("api_reconcile_completed", {
+            "case_id": n_data.case_id,
+            "completeness_score": recon.get("completeness_score")
+        }, user=reviewer_name)
+
+        # Draft rebuttal
+        rebuttal = self.draft_rebuttal(n_data, f_data, recon, custom_instructions=custom_instructions)
+        self.audit_logger.log_event("api_rebuttal_drafted", {
+            "case_id": n_data.case_id,
+            "engine": self.llama_engine.last_engine_used
+        }, user=reviewer_name)
+
+        # Approval parity (Phase 5): canonical fingerprint + approval event,
+        # so headless packets carry the same custody guarantees as the UI.
+        from .fingerprint import case_fingerprint as _case_fp
+        fp = _case_fp(n_data.to_dict(), f_data.to_dict(),
+                      recon.get("evidence_items") and {i["doc_type"]: i for i in recon["evidence_items"]} or {},
+                      rebuttal, policy_text or "", custom_instructions or "", self.merchant_name or "")
+        approval_event = self.audit_logger.log_event("api_rebuttal_approved", {
+            "case_id": n_data.case_id,
+            "fingerprint": fp["fingerprint"],
+            "fingerprint_version": fp["version"],
+            "rebuttal_sha256": AuditLogger.calculate_sha256(rebuttal.encode("utf-8")),
+            "gate_override": False,
+            "readiness_submittable": (recon.get("evidence_readiness") or {}).get("submittable"),
+            "message": "Headless approval recorded by SDK/API pipeline",
+        }, user=reviewer_name)
+
+        # Generate PDF if requested
+        pdf_b64 = None
+        sha_digest = None
+        if generate_pdf:
+            pdf_bytes = self.generate_pdf_packet_hashed(
+                n_data, f_data, recon, rebuttal,
+                approved_by=reviewer_name,
+                policy_text=policy_text,
+                approval_fingerprint=fp["fingerprint"],
+                chain_head=self.audit_logger.chain_head,
+            )
+            sha_digest = AuditLogger.calculate_sha256(pdf_bytes)
+            pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
+            self.audit_logger.log_event("api_packet_generated", {
+                "case_id": n_data.case_id,
+                "sha256": sha_digest,
+                "approval_event_hash": approval_event["event_hash"],
+            }, user=reviewer_name)
+
+        return DisputePacketResponse(
+            case_id=n_data.case_id,
+            disputed_amount=recon.get("disputed_amount", 0.0),
+            completeness_score=recon.get("completeness_score", 0),
+            completeness_assessment=recon.get("completeness_assessment", ""),
+            rebuttal_text=rebuttal,
+            pdf_base64=pdf_b64,
+            sha256_digest=sha_digest,
+            discrepancies=recon.get("discrepancies", []),
+            audit_highlights=recon.get("audit_highlights", []),
+            collection_gaps=recon.get("collection_gaps", []),
+            evidence_items=recon.get("evidence_items", [])
+        )
+
+    # ------------------------------------------------------------------ Phase 6
+
+    def build_submission_bundle(
+        self,
+        notice: Union[NoticeData, Dict[str, Any]],
+        folio: Union[FolioData, Dict[str, Any]],
+        reconciliation: Dict[str, Any],
+        packet_bytes: bytes,
+        exhibit_files: Dict[str, bytes],
+        portal_id: str = "generic",
+    ):
+        """Builds the submission ZIP (packet + exhibits + manifest + instructions)."""
+        from .submission import build_submission_bundle as _build
+        n_dict = notice.to_dict() if isinstance(notice, NoticeData) else notice
+        f_dict = folio.to_dict() if isinstance(folio, FolioData) else folio
+        manifest = self.audit_logger.build_case_manifest(n_dict.get("case_id"))
+        zip_bytes, info = _build(n_dict, f_dict, reconciliation, packet_bytes, exhibit_files, manifest, portal_id=portal_id)
+        self.audit_logger.log_event("api_submission_bundle_built", {
+            "case_id": n_dict.get("case_id"), "portal": portal_id,
+            "bundle_sha256": info["bundle_sha256"], "size_bytes": info["size_bytes"],
+        }, user="SDK/API")
+        return zip_bytes, info
+
+    def register_submission(self, record: Union["SubmissionRecord", Dict[str, Any]]):
+        """Registers a staff-confirmed portal submission (duplicate-guarded by validate_bundle)."""
+        from .models import SubmissionRecord
+        from .submission import SubmissionRegistry
+        rec = record if isinstance(record, SubmissionRecord) else SubmissionRecord.from_dict(record)
+        saved = SubmissionRegistry().register_submission(rec)
+        self.audit_logger.log_event("api_submission_registered", {
+            "case_id": rec.case_id, "portal": rec.portal_id,
+            "confirmation_reference": rec.confirmation_reference,
+            "bundle_sha256": rec.bundle_sha256,
+            "expected_decision_by": saved.expected_decision_by,
+        }, user=rec.submitted_by or "SDK/API")
+        return saved
+
+    def record_outcome(self, record: Union["OutcomeRecord", Dict[str, Any]]):
+        """Records the issuer decision / escalation for a case."""
+        from .models import OutcomeRecord
+        from .submission import SubmissionRegistry
+        rec = record if isinstance(record, OutcomeRecord) else OutcomeRecord.from_dict(record)
+        saved = SubmissionRegistry().record_outcome(rec)
+        self.audit_logger.log_event("api_issuer_outcome_recorded", {
+            "case_id": rec.case_id, "decision": rec.decision,
+            "amount_recovered": rec.amount_recovered, "next_stage": rec.next_stage,
+        }, user="SDK/API")
+        return saved
+
+    # ------------------------------------------------------------- Phases 7–9
+
+    def escalation_status(self, case_id: str) -> Dict[str, Any]:
+        """Current escalation stage, deadlines, rounds, losses, arbitration."""
+        from .escalation import EscalationRegistry
+        return EscalationRegistry().status(case_id)
+
+    def record_loss(self, case_id: str, loss_reason: str, issuer_text: str = "", actor: str = "SDK/API"):
+        """Records why the issuer ruled against the merchant + gap analysis."""
+        from .escalation import EscalationRegistry, gap_analysis
+        registry = EscalationRegistry()
+        record = registry.record_loss(case_id, loss_reason, issuer_text, actor=actor)
+        data = registry.load(case_id)
+        gaps = gap_analysis(data["rounds"][-1]) if data["rounds"] else []
+        self.audit_logger.log_event("api_loss_recorded", {
+            "case_id": case_id, "loss_reason": loss_reason, "gaps": len(gaps),
+        }, user=actor)
+        return {"loss": record, "gap_checklist": gaps}
+
+    def arbitration_assessment(self, network: Optional[str], disputed_amount: float,
+                               readiness_score: Optional[int]) -> Dict[str, Any]:
+        """Fee/EV decision support for arbitration (heuristic, labelled)."""
+        from .escalation import arbitration_assessment as _assess
+        return _assess(network, disputed_amount, readiness_score)
+
+    def draft_supplemental_rebuttal(self, notice, folio, reconciliation, prior_round,
+                                    loss: Optional[Dict[str, Any]] = None,
+                                    custom_instructions: Optional[str] = None) -> str:
+        """Drafts the pre-arb supplemental rebuttal referencing the prior round."""
+        n_dict = notice.to_dict() if isinstance(notice, NoticeData) else notice
+        f_dict = folio.to_dict() if isinstance(folio, FolioData) else folio
+        return self.llama_engine.draft_supplemental_rebuttal(
+            n_dict, f_dict, reconciliation, prior_round, loss=loss,
+            custom_instructions=custom_instructions)
+
+    # -------------------------------------------------------------- Phase 10
+
+    def compute_damages(self, notice, folio, outcomes=None, arbitration=None, chargeback_fee: float = 0.0):
+        """Statement of loss for civil/criminal filings."""
+        from .legal import compute_damages as _damages
+        n_dict = notice.to_dict() if isinstance(notice, NoticeData) else notice
+        f_dict = folio.to_dict() if isinstance(folio, FolioData) else folio
+        return _damages(n_dict, f_dict, outcomes=outcomes, arbitration=arbitration, chargeback_fee=chargeback_fee)
+
+    def generate_affidavit(self, notice, folio, manifest: Dict[str, Any], affiant: Optional[Dict[str, str]] = None) -> bytes:
+        """Business Records Affidavit TEMPLATE (sign + notarize offline)."""
+        from .legal import generate_business_records_affidavit
+        n_dict = notice.to_dict() if isinstance(notice, NoticeData) else notice
+        f_dict = folio.to_dict() if isinstance(folio, FolioData) else folio
+        return generate_business_records_affidavit(n_dict, f_dict, manifest, affiant=affiant)
+
+    def build_court_bundle(self, notice, folio, packet_bytes: bytes, exhibit_files: Dict[str, bytes],
+                           legal_docs: Dict[str, bytes], manifest: Dict[str, Any], damages: Dict[str, Any],
+                           fraud_report: Optional[Dict[str, Any]] = None):
+        """Court exhibit ZIP (packet + legal templates + exhibits + damages)."""
+        from .legal import build_court_bundle as _build
+        n_dict = notice.to_dict() if isinstance(notice, NoticeData) else notice
+        f_dict = folio.to_dict() if isinstance(folio, FolioData) else folio
+        zip_bytes, info = _build(n_dict, f_dict, packet_bytes, exhibit_files, legal_docs, manifest, damages,
+                                 fraud_report=fraud_report)
+        self.audit_logger.log_event("api_court_bundle_built", {
+            "case_id": n_dict.get("case_id"), "bundle_sha256": info["bundle_sha256"],
+            "contents": info["contents"],
+        }, user="SDK/API")
+        return zip_bytes, info

@@ -1,0 +1,4 @@
+Date,Description,Charge,Credit,Reference,Category
+2026-09-30,Prepaid Room Deposit - Flexible Rate,412.0,0.0,DEP-6610,Room
+2026-09-30,Visa Payment (Auth: VH22100),0.0,412.0,AUTH-VH22100,Payment
+2026-10-02,Refund Issued - Cancellation CX-66101,0.0,412.0,RF-884120-6610,Refund

@@ -1,0 +1,164 @@
+{
+  "scenario_key": "visa_refund_issued_13_6",
+  "title": "Scenario 5: Visa 13.6 \u2014 Credit Not Processed (Refund Already Issued)",
+  "description": "Guest cancelled inside the free-cancellation window and the hotel refunded $412.00, but the cardholder disputed before the credit posted. The winning exhibit is the refund credit receipt.",
+  "notice": {
+    "case_id": "V-DISP-87712-R",
+    "card_network": "Visa",
+    "reason_code": "13.6",
+    "reason_description": "Credit Not Processed",
+    "disputed_amount": 412.0,
+    "original_amount": 412.0,
+    "currency": "USD",
+    "transaction_date": "2026-09-30",
+    "dispute_date": "2026-10-22",
+    "response_deadline": "2026-11-10",
+    "cardholder_name": "Tomas Herrera",
+    "card_last_4": "2210",
+    "arn": "24492156291002918722100",
+    "claim_statement": "I cancelled within the free cancellation window and never received my refund.",
+    "dispute_stage": "chargeback",
+    "merchant_id": "MID-884120937",
+    "raw_text": "VISA CHARGEBACK DISPUTE NOTIFICATION\nAcquirer Reference Number: 24492156291002918722100\nCase Number: V-DISP-87712-R\nCardholder Name: Tomas Herrera\nAccount Number: ************2210\nDispute Reason Code: 13.6\nDisputed Amount: $412.00 USD\nCardholder Statement: 'I cancelled within the free cancellation window and never received my refund.'"
+  },
+  "folio": {
+    "hotel_name": "Grand Horizon Resort & Suites",
+    "hotel_address": "100 Ocean Avenue, Miami Beach, FL 33139",
+    "guest_name": "Tomas Herrera",
+    "folio_number": "RES-2026-6610",
+    "room_number": "\u2014 (Cancelled)",
+    "check_in": "2026-10-05",
+    "check_out": "2026-10-07",
+    "rate_per_night": 180.0,
+    "total_charges": 412.0,
+    "total_payments": 412.0,
+    "balance": 0.0,
+    "card_last_4": "2210",
+    "auth_code": "VH22100",
+    "merchant_id": "MID-884120937",
+    "confirmation_number": "GH-661000",
+    "booking_channel": "direct_web",
+    "booking_source": "Hotel Website",
+    "stay_status": "cancelled",
+    "rate_plan": "Flexible - Free Cancellation 48h",
+    "cancellation_timestamp": "2026-10-01 10:05 AM",
+    "cancellation_number": "CX-66101",
+    "refund_amount": 412.0,
+    "refund_date": "2026-10-02",
+    "refund_reference": "RF-884120-6610",
+    "line_items": [
+      {
+        "date": "2026-09-30",
+        "description": "Prepaid Room Deposit - Flexible Rate",
+        "amount": 412.0,
+        "type": "Charge",
+        "reference": "DEP-6610",
+        "category": "Room",
+        "disputed": null
+      },
+      {
+        "date": "2026-09-30",
+        "description": "Visa Payment (Auth: VH22100)",
+        "amount": 412.0,
+        "type": "Credit",
+        "reference": "AUTH-VH22100",
+        "category": "Payment",
+        "disputed": null
+      },
+      {
+        "date": "2026-10-02",
+        "description": "Refund Issued - Cancellation CX-66101",
+        "amount": 412.0,
+        "type": "Credit",
+        "reference": "RF-884120-6610",
+        "category": "Refund",
+        "disputed": null
+      }
+    ],
+    "raw_text": "Reservation RES-2026-6610 Tomas Herrera. Cancelled 2026-10-01 inside window; refund RF-884120-6610 issued 2026-10-02."
+  },
+  "supporting_docs": {
+    "cancellation_policy_acceptance": {
+      "present": true,
+      "filename": "booking_acceptance_GH-661000.pdf",
+      "sha256": "0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a",
+      "source": "Hotel website booking engine",
+      "verified_by": "Revenue Manager",
+      "details": {
+        "accepted_at": "2026-09-25 08:40 UTC",
+        "policy_text": "Free cancellation until 48 hours before arrival."
+      }
+    },
+    "booking_confirmation": true,
+    "guest_communication_log": {
+      "present": true,
+      "filename": "guest_comms_herrera.pdf",
+      "sha256": "1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b",
+      "source": "Reservations inbox",
+      "verified_by": "Revenue Manager"
+    },
+    "refund_credit_receipt": {
+      "present": true,
+      "filename": "refund_receipt_RF-884120-6610.pdf",
+      "sha256": "2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c",
+      "source": "Processor portal",
+      "verified_by": "Revenue Manager",
+      "details": {
+        "amount": 412.0,
+        "date": "2026-10-02"
+      }
+    }
+  },
+  "generated_evidence": [
+    {
+      "doc_type": "cancellation_policy_acceptance",
+      "generated_file": "evidence/01_cancellation_policy_acceptance.pdf",
+      "scenario_filename": "booking_acceptance_GH-661000.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "accepted_at": "2026-09-25 08:40 UTC",
+        "policy_text": "Free cancellation until 48 hours before arrival."
+      }
+    },
+    {
+      "doc_type": "booking_confirmation",
+      "generated_file": "evidence/02_booking_confirmation.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "guest_communication_log",
+      "generated_file": "evidence/03_guest_communication_log.pdf",
+      "scenario_filename": "guest_comms_herrera.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "refund_credit_receipt",
+      "generated_file": "evidence/04_refund_credit_receipt.pdf",
+      "scenario_filename": "refund_receipt_RF-884120-6610.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "amount": 412.0,
+        "date": "2026-10-02"
+      }
+    }
+  ],
+  "guide": {
+    "folder": "05_visa_13_6_refund_already_issued",
+    "purpose": "Credit-not-processed dispute where the hotel already refunded the full amount.",
+    "steps": [
+      "Upload the Visa 13.6 notice and folio.",
+      "Verify refund amount $412.00, refund date, reference RF-884120-6610, cancellation timestamp, and cancellation number.",
+      "Upload policy, communications, and refund receipt evidence; record refund amount/reference in Probative details.",
+      "Draft, approve, compile, and inspect the closing request."
+    ],
+    "expected": [
+      "Amount proof identifies the cardholder as already made whole.",
+      "Settlement state is SETTLED_THEN_REFUNDED.",
+      "Executive summary and closing request denial of double recovery, not a generic reversal request.",
+      "Refund receipt is a dispositive exhibit."
+    ]
+  }
+}

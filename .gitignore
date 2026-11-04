@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Streamlit
+.streamlit/
+
+# Environment & Secrets
+.env
+*.env.local
+
+# Audit Logs & Output Packets
+logs/*.jsonl
+*.pdf
+!samples/*.pdf
+!FolioShield*workflow*.pdf
+!test_artifacts/manual_testing/**/*.pdf
+
+# Runtime case data (submissions, exhibits, custody records)
+data/submissions/
+
+# Node (tooling only, not part of the Python app)
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

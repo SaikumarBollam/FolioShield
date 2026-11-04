@@ -1,0 +1,174 @@
+{
+  "scenario_key": "ota_virtual_card_10_4",
+  "title": "Scenario 4: Visa 10.4 \u2014 OTA Virtual Card (Booking.com VCC)",
+  "description": "Guest booked via Booking.com and paid the OTA; the hotel charged the OTA's single-use virtual card. The dispute names the OTA as cardholder while the folio names the guest \u2014 a third-party payer case, not a name mismatch error.",
+  "notice": {
+    "case_id": "V-DISP-90331-O",
+    "card_network": "Visa",
+    "reason_code": "10.4",
+    "reason_description": "Other Fraud: Card-Absent Environment",
+    "disputed_amount": 540.0,
+    "original_amount": 540.0,
+    "currency": "USD",
+    "transaction_date": "2026-10-18",
+    "dispute_date": "2026-10-30",
+    "response_deadline": "2026-11-14",
+    "cardholder_name": "Booking.com B.V.",
+    "card_last_4": "7731",
+    "arn": "24492156291002918877310",
+    "claim_statement": "Virtual card was charged outside the agreed booking terms.",
+    "dispute_stage": "chargeback",
+    "merchant_id": "MID-884120937",
+    "raw_text": "VISA CHARGEBACK DISPUTE NOTIFICATION\nAcquirer Reference Number: 24492156291002918877310\nCase Number: V-DISP-90331-O\nCardholder Name: Booking.com B.V.\nAccount Number: ************7731\nDispute Reason Code: 10.4\nDisputed Amount: $540.00 USD\nCardholder Statement: 'Virtual card was charged outside the agreed booking terms.'"
+  },
+  "folio": {
+    "hotel_name": "Grand Horizon Resort & Suites",
+    "hotel_address": "100 Ocean Avenue, Miami Beach, FL 33139",
+    "guest_name": "Priya Nair",
+    "folio_number": "FOL-2026-6107",
+    "room_number": "517",
+    "check_in": "2026-10-18",
+    "check_out": "2026-10-20",
+    "rate_per_night": 240.0,
+    "total_charges": 540.0,
+    "total_payments": 540.0,
+    "balance": 0.0,
+    "card_last_4": "7731",
+    "auth_code": "VC44190",
+    "merchant_id": "MID-884120937",
+    "confirmation_number": "BDC-4412098",
+    "booking_channel": "ota",
+    "booking_source": "Booking.com",
+    "booking_date": "2026-10-02",
+    "stay_status": "occupied",
+    "payer_name": "Booking.com B.V.",
+    "payer_relationship": "OTA virtual card",
+    "entry_mode": "ecommerce",
+    "line_items": [
+      {
+        "date": "2026-10-18",
+        "description": "Room Accommodation - Queen",
+        "amount": 240.0,
+        "type": "Charge",
+        "reference": "RM517",
+        "category": "Room",
+        "disputed": null
+      },
+      {
+        "date": "2026-10-18",
+        "description": "Occupancy & Resort Tax (12.5%)",
+        "amount": 30.0,
+        "type": "Charge",
+        "reference": "TAX-OCC",
+        "category": "Tax",
+        "disputed": null
+      },
+      {
+        "date": "2026-10-19",
+        "description": "Room Accommodation - Queen",
+        "amount": 240.0,
+        "type": "Charge",
+        "reference": "RM517",
+        "category": "Room",
+        "disputed": null
+      },
+      {
+        "date": "2026-10-19",
+        "description": "Occupancy & Resort Tax (12.5%)",
+        "amount": 30.0,
+        "type": "Charge",
+        "reference": "TAX-OCC",
+        "category": "Tax",
+        "disputed": null
+      },
+      {
+        "date": "2026-10-20",
+        "description": "Visa Virtual Card Payment (Auth: VC44190)",
+        "amount": 540.0,
+        "type": "Credit",
+        "reference": "AUTH-VC44190",
+        "category": "Payment",
+        "disputed": null
+      }
+    ],
+    "raw_text": "Booking.com reservation BDC-4412098 guest Priya Nair. Paid by OTA virtual card."
+  },
+  "supporting_docs": {
+    "signed_registration_card": {
+      "present": true,
+      "filename": "reg_card_nair_517.pdf",
+      "sha256": "8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e",
+      "source": "Front desk scan",
+      "verified_by": "A. Rivera"
+    },
+    "id_verification_log": true,
+    "keycard_lock_audit": true,
+    "booking_confirmation": {
+      "present": true,
+      "filename": "bookingcom_confirmation_BDC-4412098.pdf",
+      "sha256": "9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f",
+      "source": "Booking.com extranet",
+      "verified_by": "A. Rivera",
+      "details": {
+        "recipient": "guest via Booking.com",
+        "vcc_terms": "Single-use, stay dates only, max $540.00"
+      }
+    },
+    "guest_service_log": true
+  },
+  "generated_evidence": [
+    {
+      "doc_type": "signed_registration_card",
+      "generated_file": "evidence/01_signed_registration_card.pdf",
+      "scenario_filename": "reg_card_nair_517.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "id_verification_log",
+      "generated_file": "evidence/02_id_verification_log.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "keycard_lock_audit",
+      "generated_file": "evidence/03_keycard_lock_audit.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "booking_confirmation",
+      "generated_file": "evidence/04_booking_confirmation.pdf",
+      "scenario_filename": "bookingcom_confirmation_BDC-4412098.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "recipient": "guest via Booking.com",
+        "vcc_terms": "Single-use, stay dates only, max $540.00"
+      }
+    },
+    {
+      "doc_type": "guest_service_log",
+      "generated_file": "evidence/05_guest_service_log.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    }
+  ],
+  "guide": {
+    "folder": "04_visa_10_4_ota_virtual_card",
+    "purpose": "OTA virtual-card booking where cardholder and guest legitimately differ.",
+    "steps": [
+      "Upload the Visa notice and folio.",
+      "Verify cardholder Booking.com B.V., guest Priya Nair, channel OTA, source Booking.com, and payer relationship.",
+      "Upload the registration, ID, keycard, booking confirmation, and service-log evidence.",
+      "Draft and review the third-party-payer explanation before approval."
+    ],
+    "expected": [
+      "THIRD_PARTY_PAYER appears as informational, not NAME_MISMATCH.",
+      "Folio identity is evaluated in OTA context; do not expect guest and cardholder names to match.",
+      "The rebuttal should reference the OTA confirmation and virtual-card booking context."
+    ]
+  }
+}

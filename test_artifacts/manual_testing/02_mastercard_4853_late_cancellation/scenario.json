@@ -1,0 +1,190 @@
+{
+  "scenario_key": "mc_cancellation_4853",
+  "title": "Scenario 2: Mastercard 4853 \u2014 Late Cancellation / Non-Refundable Rate",
+  "description": "Cardholder disputes $690.00 advance purchase room rate alleging timely cancellation. Merchant records demonstrate explicit non-refundable booking terms and cancellation 2 hours prior to arrival.",
+  "notice": {
+    "case_id": "MC-CLM-44019-B",
+    "card_network": "Mastercard",
+    "reason_code": "4853",
+    "reason_description": "Cardholder Dispute: Defective / Services Not Rendered",
+    "disputed_amount": 690.0,
+    "original_amount": 690.0,
+    "currency": "USD",
+    "transaction_date": "2026-09-28",
+    "dispute_date": "2026-10-15",
+    "response_deadline": "2026-11-01",
+    "cardholder_name": "Eleanor Vance",
+    "card_last_4": "9012",
+    "arn": "55102948291048201948201",
+    "claim_statement": "I cancelled my hotel reservation and should not have been charged.",
+    "dispute_stage": "chargeback",
+    "merchant_id": "MID-884120937",
+    "raw_text": "MASTERCARD DISPUTE RECORD\nCase Number: MC-CLM-44019-B\nDispute Reason Code: 4853\nReason: Goods / Services Not Rendered\nCardholder: Eleanor Vance\nAccount: ************9012\nDisputed Amount: $690.00\nMerchant: Grand Horizon Resort & Suites\nCardholder Statement: 'I cancelled my hotel reservation and should not have been charged.'"
+  },
+  "folio": {
+    "hotel_name": "Grand Horizon Resort & Suites",
+    "hotel_address": "100 Ocean Avenue, Miami Beach, FL 33139",
+    "guest_name": "Eleanor Vance",
+    "folio_number": "RES-2026-7731",
+    "room_number": "308 (Reserved)",
+    "check_in": "2026-09-28",
+    "check_out": "2026-09-30",
+    "rate_per_night": 300.0,
+    "total_charges": 690.0,
+    "total_payments": 690.0,
+    "balance": 0.0,
+    "card_last_4": "9012",
+    "auth_code": "MC77192",
+    "merchant_id": "MID-884120937",
+    "confirmation_number": "GH-773100",
+    "booking_channel": "direct_web",
+    "booking_source": "Hotel Website",
+    "stay_status": "cancelled",
+    "rate_plan": "Advance Purchase - Non-Refundable",
+    "cancellation_timestamp": "2026-09-28 11:42 AM",
+    "cancellation_number": "CX-55210",
+    "line_items": [
+      {
+        "date": "2026-09-28",
+        "description": "Guaranteed Room - Advance Purchase (Non-Refundable)",
+        "amount": 600.0,
+        "type": "Charge",
+        "reference": "RES-7731",
+        "category": "Room",
+        "disputed": null
+      },
+      {
+        "date": "2026-09-28",
+        "description": "State & Tourism Lodging Tax (15.0%)",
+        "amount": 90.0,
+        "type": "Charge",
+        "reference": "TAX-LOD",
+        "category": "Tax",
+        "disputed": null
+      },
+      {
+        "date": "2026-09-28",
+        "description": "Mastercard Settlement (Auth: MC77192)",
+        "amount": 690.0,
+        "type": "Credit",
+        "reference": "AUTH-MC77192",
+        "category": "Payment",
+        "disputed": null
+      }
+    ],
+    "raw_text": "Reservation RES-2026-7731 Eleanor Vance. Non-refundable advance purchase rate. Cancelled after 48hr window."
+  },
+  "supporting_docs": {
+    "signed_registration_card": false,
+    "emv_terminal_receipt": {
+      "present": true,
+      "filename": "gateway_auth_MC77192.pdf",
+      "sha256": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d",
+      "source": "Payment gateway",
+      "verified_by": "Front Office Manager"
+    },
+    "avs_cvv_result": true,
+    "cancellation_policy_acceptance": {
+      "present": true,
+      "filename": "booking_acceptance_GH-773100.pdf",
+      "sha256": "2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e",
+      "source": "Hotel website booking engine",
+      "verified_by": "Front Office Manager",
+      "details": {
+        "accepted_at": "2026-09-20 09:14 UTC",
+        "policy_text": "Advance Purchase: non-refundable, no changes."
+      }
+    },
+    "keycard_lock_audit": false,
+    "id_verification_log": true,
+    "booking_confirmation": {
+      "present": true,
+      "filename": "confirmation_email_GH-773100.eml",
+      "sha256": "3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f",
+      "source": "PMS confirmation",
+      "verified_by": "Front Office Manager",
+      "details": {
+        "recipient": "eleanor.vance@example.com"
+      }
+    },
+    "guest_communication_log": {
+      "present": true,
+      "filename": "guest_comms_vance.pdf",
+      "sha256": "4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a",
+      "source": "Reservations inbox",
+      "verified_by": "Front Office Manager"
+    },
+    "guest_service_log": true
+  },
+  "generated_evidence": [
+    {
+      "doc_type": "emv_terminal_receipt",
+      "generated_file": "evidence/02_emv_terminal_receipt.pdf",
+      "scenario_filename": "gateway_auth_MC77192.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "avs_cvv_result",
+      "generated_file": "evidence/03_avs_cvv_result.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "cancellation_policy_acceptance",
+      "generated_file": "evidence/04_cancellation_policy_acceptance.pdf",
+      "scenario_filename": "booking_acceptance_GH-773100.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "accepted_at": "2026-09-20 09:14 UTC",
+        "policy_text": "Advance Purchase: non-refundable, no changes."
+      }
+    },
+    {
+      "doc_type": "id_verification_log",
+      "generated_file": "evidence/06_id_verification_log.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "booking_confirmation",
+      "generated_file": "evidence/07_booking_confirmation.eml",
+      "scenario_filename": "confirmation_email_GH-773100.eml",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {
+        "recipient": "eleanor.vance@example.com"
+      }
+    },
+    {
+      "doc_type": "guest_communication_log",
+      "generated_file": "evidence/08_guest_communication_log.pdf",
+      "scenario_filename": "guest_comms_vance.pdf",
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    },
+    {
+      "doc_type": "guest_service_log",
+      "generated_file": "evidence/09_guest_service_log.txt",
+      "scenario_filename": null,
+      "scenario_sha256_note": "Scenario JSON contains demo hash metadata; generated file hash will differ and is computed by the app on upload.",
+      "details_to_enter": {}
+    }
+  ],
+  "guide": {
+    "folder": "02_mastercard_4853_late_cancellation",
+    "purpose": "Cancelled advance-purchase reservation where timing and policy acceptance decide the case.",
+    "steps": [
+      "Upload the Mastercard notice and folio in Custom Document Upload mode.",
+      "Verify stay_status=cancelled, rate plan, cancellation timestamp, and cancellation number CX-55210.",
+      "Upload the evidence files; record policy accepted_at and exact policy text if editing details.",
+      "Draft, approve, compile, and build a Fiserv submission bundle."
+    ],
+    "expected": [
+      "Occupancy-only requirements should not be treated as missing for a cancelled stay.",
+      "Cancellation/policy evidence is central; registration/keycard absence is expected.",
+      "The rebuttal summary should use the cancelled-reservation variant, not claim services were occupied/rendered."
+    ]
+  }
+}
