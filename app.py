@@ -15,6 +15,7 @@ while critical collection gaps remain (explicit override is logged).
 import hashlib
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
