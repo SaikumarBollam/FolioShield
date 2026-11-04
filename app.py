@@ -633,6 +633,8 @@ with tab_ingest:
                     log("folio_rejected", {"filename": folio_file.name, "error": str(e)})
                 else:
                     st.session_state.folio_data = {**empty_folio(), **parsed_folio}
+                    st.session_state.folio_file_bytes = folio_bytes
+                    st.session_state.folio_file_name = folio_file.name
                     _ui_state.mark_case_touched(st.session_state)
                     reset_outputs()
                     log("folio_uploaded", {
@@ -1296,7 +1298,11 @@ with tab_pdf:
     prior = registry.load(case_key)
     exhibit_files_now = retained_exhibit_files()
     retained_letters = sorted(exhibit_files_now.keys())
-    cited_letters = [e["letter"] for e in (reconciliation.get("exhibits") or []) if e.get("file_backed")]
+    cited_letters = [
+        e["letter"] for e in (reconciliation.get("exhibits") or [])
+        if e.get("file_backed")
+        and not (e.get("doc_type") == "__folio__" and (e.get("letter") in retained_letters or pdf_current))
+    ]
     unretained = [l for l in cited_letters if l not in retained_letters]
     if unretained:
         st.warning(f"Exhibit(s) {', '.join(unretained)} are cited as collected but their file bytes are not retained in this session "

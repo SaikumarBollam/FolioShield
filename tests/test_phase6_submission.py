@@ -154,5 +154,32 @@ class TestPhase6Submission(unittest.TestCase):
                 submission_module.SubmissionRegistry = original
 
 
+    def test_07_auto_convert_text_and_csv_exhibits(self):
+        s = SCENARIOS["visa_fraud_10_4"]
+        recon = Reconciler.reconcile(s["notice"], s["folio"], s["supporting_docs"], today=TODAY)
+        exhibits = {
+            "B": b"%PDF-reg",
+            "C": b"lock,event,time\n412,open,12:00",
+            "D": b"%PDF-id",
+            "E": b"auth,status,code\nY,Match,01",
+            "F": b"From: hotel\nTo: guest\nSubject: Booking",
+            "G": b"%PDF-pos",
+            "H": b"mac,ip,time\naa,1.1,10:00"
+        }
+        res = validate_bundle(s["notice"], recon, "clean draft", b"%PDF-packet", exhibits, portal_id="chase")
+        check_dict = {c["rule"]: c["ok"] for c in res["checks"]}
+        self.assertTrue(check_dict.get("exhibits_retained"), "exhibits_retained should pass when folio is in packet")
+        self.assertTrue(check_dict.get("file_types"), "file_types should pass because CSV/EML are auto-converted to PDF")
+
+        manifest = {"manifest_version": "1", "case_id": "V-1", "chain_head": {"head_hash": "x" * 64, "event_count": 1}}
+        zip_bytes, info = build_submission_bundle(s["notice"], s["folio"], recon, b"%PDF-packet", exhibits, manifest, portal_id="chase")
+        self.assertTrue(zip_bytes.startswith(b"PK"))
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            for item in info["exhibit_map"]:
+                self.assertTrue(item["arcname"].endswith(".pdf"), f"{item['arcname']} should be converted to .pdf")
+                content = zf.read(item["arcname"])
+                self.assertTrue(content.startswith(b"%PDF"), f"{item['arcname']} should be valid PDF bytes")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -125,6 +125,11 @@ def retained_exhibit_files(state: MutableMapping[str, Any], reconciliation: Dict
     for exhibit in (reconciliation.get("exhibits") or []):
         if not exhibit.get("file_backed"):
             continue
+        if exhibit.get("doc_type") == "__folio__":
+            folio_bytes = state.get("folio_file_bytes")
+            if folio_bytes is not None:
+                out[exhibit["letter"]] = folio_bytes
+            continue
         item = items_by_type.get(exhibit.get("doc_type")) or {}
         data = store.get(item.get("stored_ref") or exhibit.get("sha256"), item.get("filename") or "")
         if data is not None:

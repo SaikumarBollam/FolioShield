@@ -39,6 +39,91 @@ def _safe(name: str) -> str:
     return _SAFE.sub("_", name or "file")[:80]
 
 
+def convert_text_or_csv_to_pdf(filename: str, data: bytes, title: str = "Exhibit Document") -> Tuple[str, bytes]:
+    """Converts plain text, CSV, or EML exhibit bytes into a clean, portal-acceptable PDF."""
+    import csv
+    from reportlab.lib.pagesizes import letter as rl_letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+
+    base, ext = os.path.splitext(filename)
+    new_filename = f"{base}.pdf"
+    lower_ext = ext.lower().lstrip(".")
+    text = data.decode("utf-8", errors="replace")
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=rl_letter,
+        leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36
+    )
+    styles = getSampleStyleSheet()
+    header_style = ParagraphStyle(
+        "ExhibitTitle",
+        parent=styles["Heading2"],
+        fontSize=13,
+        leading=16,
+        textColor=colors.HexColor("#173B50"),
+    )
+    meta_style = ParagraphStyle(
+        "ExhibitMeta",
+        parent=styles["Normal"],
+        fontSize=8,
+        leading=11,
+        textColor=colors.HexColor("#596B75"),
+    )
+    body_style = ParagraphStyle(
+        "ExhibitBody",
+        parent=styles["Normal"],
+        fontName="Courier",
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor("#252D32"),
+    )
+
+    story = [
+        Paragraph(f"<b>{title}</b>", header_style),
+        Paragraph(f"Original File: {filename} · Converted to PDF for Acquirer Portal Compliance", meta_style),
+        Spacer(1, 10),
+    ]
+
+    if lower_ext == "csv":
+        reader = csv.reader(io.StringIO(text))
+        rows = []
+        for i, row in enumerate(reader):
+            if i > 250:
+                rows.append([Paragraph("<i>[Truncated...]</i>", body_style)] + [""] * (len(row) - 1))
+                break
+            rows.append([Paragraph(str(cell)[:60], body_style) for cell in row])
+        if rows:
+            max_cols = max(len(r) for r in rows)
+            for r in rows:
+                if len(r) < max_cols:
+                    r.extend([""] * (max_cols - len(r)))
+            col_width = max(30, 540 // max_cols) if max_cols else 540
+            t = Table(rows, colWidths=[col_width] * max_cols)
+            t.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#173B50")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]))
+            story.append(t)
+    else:
+        lines = text.splitlines()[:500]
+        escaped_lines = [
+            line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace(" ", "&nbsp;")
+            for line in lines
+        ]
+        formatted = "<br/>".join(escaped_lines)
+        story.append(Paragraph(formatted or "[Empty file]", body_style))
+
+    doc.build(story)
+    return new_filename, buffer.getvalue()
+
+
 def validate_bundle(
     notice: Dict[str, Any],
     recon: Dict[str, Any],
@@ -65,7 +150,12 @@ def validate_bundle(
     check("no_unresolved_missing", unresolved == 0, "No unresolved [MISSING] markers" if unresolved == 0 else f"Draft still contains {unresolved} [MISSING] marker(s)")
 
     exhibits = recon.get("exhibits") or []
-    missing_files = [e["letter"] for e in exhibits if e.get("file_backed") and e.get("letter") not in exhibit_files]
+    missing_files = [
+        e["letter"] for e in exhibits
+        if e.get("file_backed")
+        and not (e.get("doc_type") == "__folio__" and (e.get("letter") in exhibit_files or bool(packet_bytes)))
+        and e.get("letter") not in exhibit_files
+    ]
     check("exhibits_retained", not missing_files,
           "All cited exhibits retained" if not missing_files else f"Exhibit(s) {', '.join(missing_files)} cited as attached but their file bytes could not be retrieved from the exhibit store — re-upload them in Tab 2 (check the exhibit-store directory is writable)")
 
@@ -86,7 +176,7 @@ def validate_bundle(
     for letter in exhibit_files:
         item = exhibits_by_letter.get(letter) or {}
         ext = os.path.splitext(item.get("filename") or "")[1].lower().lstrip(".")
-        if ext and ext not in profile["accepted_types"]:
+        if ext and ext not in profile["accepted_types"] and ext not in ("csv", "txt", "eml", "log"):
             bad_types.append(f"Exhibit {letter} ({ext})")
     check("file_types", not bad_types,
           "All exhibit file types accepted by the portal" if not bad_types
@@ -130,9 +220,18 @@ def build_submission_bundle(
         for letter in sorted(exhibit_files.keys()):
             item = exhibits_by_letter.get(letter) or {}
             doc_type = _safe(str(item.get("doc_type") or "exhibit"))
-            filename = _safe(str(item.get("filename") or f"exhibit_{letter}"))
+            raw_filename = str(item.get("filename") or f"exhibit_{letter}")
+            file_data = exhibit_files[letter]
+            ext = os.path.splitext(raw_filename)[1].lower().lstrip(".")
+            if ext in ("csv", "txt", "eml", "log") and ext not in profile.get("accepted_types", []):
+                pdf_filename, file_data = convert_text_or_csv_to_pdf(
+                    raw_filename, file_data, title=f"Exhibit {letter} — {item.get('label') or doc_type}"
+                )
+                filename = _safe(pdf_filename)
+            else:
+                filename = _safe(raw_filename)
             arcname = f"Exhibit_{letter}_{doc_type}_{filename}"
-            zf.writestr(arcname, exhibit_files[letter])
+            zf.writestr(arcname, file_data)
             exhibit_map.append({
                 "letter": letter, "arcname": arcname, "label": item.get("label"),
                 "doc_type": item.get("doc_type"), "filename": item.get("filename"),
