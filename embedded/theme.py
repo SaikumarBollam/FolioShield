@@ -26,14 +26,14 @@ _SAFE_FONT = re.compile(r"^[A-Za-z0-9 ,\-_]+$")
 _SAFE_LOGO = re.compile(r"^(https://|data:image/)[^\s\"'<>]+$")
 
 DEFAULT_THEME: Dict[str, str] = {
-    "primary_color": "#1E3A8A",
-    "accent_color": "#2563EB",
-    "background_color": "#FFFFFF",
-    "text_color": "#0F172A",
+    "primary_color": "#173B50",
+    "accent_color": "#D5B77A",
+    "background_color": "#F5F5F0",
+    "text_color": "#252D32",
     "font_family": "sans-serif",
     "brand_name": "FolioShield",
     "logo_url": "",
-    "border_radius": "6px",
+    "border_radius": "8px",
 }
 
 

@@ -92,33 +92,33 @@ st.set_page_config(
 st.markdown("""
 <style>
     :root {
-        /* Three-Toned Blue Palette */
-        /* Tone 1: Deep Navy Blue (Headings & Authority Elements) */
-        --fs-tone-1: #1E3A8A;
-        --fs-primary: #1E3A8A;
+        /* User Bespoke Palette */
+        --fs-navy: #173B50;        /* Deep Navy: Main Headings, Primary CTA, Key Accents */
+        --fs-gold: #D5B77A;        /* Muted Gold: Subheadings, Badges, Borders, Highlights */
+        --fs-offwhite: #F5F5F0;    /* Off-white: Canvas & Card Surfaces */
+        --fs-steelblue: #697B83;   /* Steel Blue: Secondary Text, Captions, Dividers */
+        --fs-charcoal: #252D32;    /* Dark Charcoal: High-contrast Body & Form Text */
 
-        /* Tone 2: True Royal Blue (Subheadings, Accent Borders & Interactive Elements) */
-        --fs-tone-2: #2563EB;
-        --fs-accent: #2563EB;
-
-        /* Tone 3: Soft Mist / Ice Tint Blue (Panels, Hover Highlights & Surfaces) */
-        --fs-tone-3: #EFF6FF;
-        --fs-tone-3-border: #BFDBFE;
-        --fs-badge-bg: #DBEAFE;
-        --fs-badge-text: #1E40AF;
-
-        --fs-bg: #FFFFFF;
-        --fs-text: #0F172A;
-        --fs-text-muted: #1E3A8A;
+        --fs-primary: var(--fs-navy);
+        --fs-accent: var(--fs-gold);
+        --fs-secondary: var(--fs-steelblue);
+        --fs-bg: var(--fs-offwhite);
+        --fs-text: var(--fs-charcoal);
         --fs-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         --fs-radius: 8px;
     }
 
-    /* Headings — Tone 1 (Deep Navy Blue) */
+    /* Main Canvas Background */
+    .stApp, [data-testid="stAppViewContainer"] {
+        background-color: var(--fs-offwhite) !important;
+        color: var(--fs-charcoal) !important;
+    }
+
+    /* Headings — Navy (#173B50) */
     .main-header, h1, .stMarkdown h1 {
         font-size: 2.2rem !important;
         font-weight: 700 !important;
-        color: var(--fs-tone-1) !important;
+        color: var(--fs-navy) !important;
         margin-bottom: 4px !important;
         font-family: var(--fs-font) !important;
         letter-spacing: -0.015em;
@@ -126,83 +126,96 @@ st.markdown("""
     h2, .stMarkdown h2 {
         font-size: 1.45rem !important;
         font-weight: 700 !important;
-        color: var(--fs-tone-1) !important;
-        border-bottom: 2px solid var(--fs-tone-3-border) !important;
+        color: var(--fs-navy) !important;
+        border-bottom: 2px solid var(--fs-gold) !important;
         padding-bottom: 6px !important;
-        margin-top: 18px !important;
+        margin-top: 20px !important;
         margin-bottom: 12px !important;
     }
 
-    /* Subheadings — Tone 2 (Royal Blue) */
+    /* Subheadings — Steel Blue (#697B83) with Muted Gold (#D5B77A) accents */
     .sub-header, p.sub-header {
         font-size: 1.05rem !important;
         font-weight: 500 !important;
-        color: var(--fs-tone-2) !important;
+        color: var(--fs-steelblue) !important;
         margin-bottom: 22px !important;
         line-height: 1.5 !important;
     }
     h3, .stMarkdown h3, [data-testid="stSubheader"] {
         font-size: 1.25rem !important;
         font-weight: 600 !important;
-        color: var(--fs-tone-2) !important;
-        margin-top: 16px !important;
+        color: var(--fs-navy) !important;
+        border-left: 3px solid var(--fs-gold) !important;
+        padding-left: 10px !important;
+        margin-top: 18px !important;
         margin-bottom: 8px !important;
     }
     h4, .stMarkdown h4 {
         font-size: 1.08rem !important;
         font-weight: 600 !important;
-        color: var(--fs-tone-2) !important;
-        margin-top: 12px !important;
+        color: var(--fs-steelblue) !important;
+        margin-top: 14px !important;
         margin-bottom: 6px !important;
     }
     h5, .stMarkdown h5 {
         font-size: 0.95rem !important;
         font-weight: 600 !important;
-        color: var(--fs-tone-2) !important;
+        color: var(--fs-steelblue) !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.04em !important;
         margin-top: 10px !important;
         margin-bottom: 4px !important;
     }
 
-    /* Three-Toned Containers & Metric Cards (Tone 3 Surface) */
+    /* Body Text & Paragraphs */
+    p, span, label, div {
+        color: var(--fs-charcoal);
+    }
+
+    /* Metric Cards & Proof Panels (Off-white / Card surface with Gold & Navy accents) */
     div[data-testid="stMetric"] {
-        background-color: var(--fs-tone-3) !important;
-        border: 1px solid var(--fs-tone-3-border) !important;
+        background-color: #FFFFFF !important;
+        border: 1px solid var(--fs-gold) !important;
+        border-top: 3px solid var(--fs-navy) !important;
         border-radius: var(--fs-radius) !important;
         padding: 12px !important;
+        box-shadow: 0 1px 3px rgba(23, 59, 80, 0.05);
     }
     div[data-testid="stMetric"] label, div[data-testid="stMetric"] [data-testid="stMetricLabel"] {
-        color: var(--fs-tone-2) !important;
+        color: var(--fs-steelblue) !important;
         font-weight: 600 !important;
     }
     div[data-testid="stMetric"] [data-testid="stMetricValue"] {
-        color: var(--fs-tone-1) !important;
+        color: var(--fs-navy) !important;
         font-weight: 700 !important;
     }
     div[data-testid="stExpander"] {
-        border: 1px solid var(--fs-tone-3-border) !important;
+        border: 1px solid #DCDCD4 !important;
         border-radius: var(--fs-radius) !important;
         background-color: #FFFFFF !important;
     }
 
-    /* Tabs Styling */
+    /* Tabs Styling (Navy & Muted Gold) */
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px;
-        border-bottom: 2px solid var(--fs-tone-3-border);
+        background-color: transparent;
+        border-bottom: 2px solid var(--fs-gold);
     }
     .stTabs [data-baseweb="tab"] {
         padding: 10px 18px;
         border-radius: var(--fs-radius) var(--fs-radius) 0px 0px;
         font-weight: 600;
-        color: var(--fs-tone-1);
+        color: var(--fs-steelblue);
+        background-color: transparent;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background-color: var(--fs-tone-3) !important;
-        color: var(--fs-tone-1) !important;
-        border-bottom: 3px solid var(--fs-tone-2) !important;
+        background-color: #FFFFFF !important;
+        color: var(--fs-navy) !important;
+        border-bottom: 3px solid var(--fs-gold) !important;
     }
     .stTabs [data-baseweb="tab"]:hover {
-        background-color: var(--fs-tone-3);
-        color: var(--fs-tone-2);
+        background-color: #EDECE6;
+        color: var(--fs-navy);
     }
 
     /* Badges & Chips */
@@ -212,42 +225,47 @@ st.markdown("""
         font-size: 12px;
         font-weight: 600;
         border-radius: 4px;
-        background-color: var(--fs-badge-bg);
-        color: var(--fs-badge-text);
-        border: 1px solid var(--fs-tone-3-border);
+        background-color: #EDECE6;
+        color: var(--fs-navy);
+        border: 1px solid var(--fs-gold);
     }
 
-    /* Primary and Secondary Buttons */
+    /* Buttons */
     .stButton > button[kind="primary"] {
-        background-color: var(--fs-tone-1) !important;
-        border-color: var(--fs-tone-1) !important;
-        color: #FFFFFF !important;
+        background-color: var(--fs-navy) !important;
+        border: 1px solid var(--fs-gold) !important;
+        color: var(--fs-gold) !important;
         border-radius: var(--fs-radius) !important;
         font-weight: 600 !important;
+        box-shadow: 0 1px 2px rgba(23, 59, 80, 0.15);
     }
     .stButton > button[kind="primary"]:hover {
-        background-color: var(--fs-tone-2) !important;
-        border-color: var(--fs-tone-2) !important;
+        background-color: var(--fs-charcoal) !important;
+        border-color: var(--fs-gold) !important;
+        color: #FFFFFF !important;
     }
     .stButton > button:not([kind="primary"]) {
-        border: 1px solid var(--fs-tone-3-border) !important;
+        border: 1px solid var(--fs-steelblue) !important;
         border-radius: var(--fs-radius) !important;
-        color: var(--fs-tone-1) !important;
+        color: var(--fs-navy) !important;
+        background-color: #FFFFFF !important;
     }
     .stButton > button:not([kind="primary"]):hover {
-        background-color: var(--fs-tone-3) !important;
-        border-color: var(--fs-tone-2) !important;
-        color: var(--fs-tone-2) !important;
+        background-color: var(--fs-offwhite) !important;
+        border-color: var(--fs-gold) !important;
+        color: var(--fs-navy) !important;
     }
 
-    /* Sidebar Styling */
+    /* Sidebar */
     section[data-testid="stSidebar"] {
-        background-color: #F8FAFD !important;
-        border-right: 1px solid var(--fs-tone-3-border) !important;
+        background-color: #ECECE6 !important;
+        border-right: 1px solid #DCDCD4 !important;
     }
     section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {
-        color: var(--fs-tone-1) !important;
+        color: var(--fs-navy) !important;
         border-bottom: none !important;
+        border-left: none !important;
+        padding-left: 0 !important;
     }
 
     .fs-brand-logo { max-height: 44px; margin-bottom: 6px; }
