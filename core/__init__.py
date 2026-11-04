@@ -11,7 +11,7 @@ from .security import mask_card_number, mask_pii, sanitize_untrusted_text
 from .audit_logger import AuditLogger
 from .rules import lookup_reason_code, get_evidence_checklist_for_dispute
 from .config import config, get_settings, Settings
-from .models import NoticeData, FolioData, FolioLineItem, DisputePacketResponse
+from .models import NoticeData, FolioData, FolioLineItem, DisputePacketResponse, EvidenceItem
 from .client import FolioShield
 from .api import FolioShieldAPIHandler, run_api_server
 
@@ -21,6 +21,7 @@ __all__ = [
     "NoticeData",
     "FolioData",
     "FolioLineItem",
+    "EvidenceItem",
     "DisputePacketResponse",
     "run_api_server",
     "FolioShieldAPIHandler",

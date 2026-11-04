@@ -141,7 +141,7 @@ class TestFolioShieldPipeline(unittest.TestCase):
         recon = Reconciler.reconcile(scenario["notice"], scenario["folio"])
         rebuttal = engine.draft_rebuttal(scenario["notice"], scenario["folio"], recon)
 
-        self.assertIn("DISPUTE REPRESENTMENT & REBUTTAL DECLARATION", rebuttal)
+        self.assertIn("DISPUTE REPRESENTMENT & REBUTTAL", rebuttal)
         self.assertIn("10.4", rebuttal)
         self.assertIn("Grand Horizon Resort & Suites", rebuttal)
 

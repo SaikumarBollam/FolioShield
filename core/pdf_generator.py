@@ -159,6 +159,9 @@ class EvidencePacketGenerator:
         approved_by: Optional[str] = None,
         approved_at: Optional[str] = None,
         policy_text: Optional[str] = None,
+        approval_fingerprint: Optional[str] = None,
+        chain_head: Optional[Dict[str, Any]] = None,
+        packet_sha256: Optional[str] = None,
     ) -> bytes:
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
@@ -208,13 +211,16 @@ class EvidencePacketGenerator:
             Paragraph("Submitted to the Acquirer / Processor Chargeback Department", s["subtitle"]),
             grid([
                 kv("Dispute Case ID:", case_id) + kv("Card Network / Code:", f"{network} — {code}"),
-                kv("Disputed Amount:", f"{_fmt_money(disp_amt)} USD") + kv("Total Folio Charges:", f"{_fmt_money(folio_tot)} USD"),
+                kv("ARN:", notice.get("arn")) + kv("Merchant ID (MID):", folio.get("merchant_id") or notice.get("merchant_id")),
+                kv("Disputed Amount:", f"{_fmt_money(disp_amt)} {notice.get('currency') or 'USD'}") + kv("Total Folio Charges:", f"{_fmt_money(folio_tot)} {notice.get('currency') or 'USD'}"),
                 kv("Account Number:", masked_card) + kv("Cardholder / Guest:", cardholder),
                 kv("Stay Dates:", f"{_or(folio.get('check_in'))} to {_or(folio.get('check_out'))}", body)
                 + kv("Response Deadline:", notice.get("response_deadline")),
             ], _cols(110, 156, 110, 156)),
             Spacer(1, 6),
+            Paragraph(f"<b>Property:</b> {esc(hotel_name)} — {esc(_or(folio.get('hotel_address')))}", body),
             Paragraph(f"<b>Reason code:</b> {esc(network)} {esc(code)} — {esc(code_name)}", body),
+            Paragraph(f"<b>Cardholder claim (as stated on the notice):</b> <i>{esc(_or(notice.get('claim_statement'), 'Not collected from the notice'))}</i>", body),
             Paragraph("<b>REBUTTAL STATEMENT (reviewed and approved by merchant staff)</b>", s["section"]),
             *cls._rebuttal_flowables(rebuttal_text, s),
             Spacer(1, 8),
@@ -239,6 +245,8 @@ class EvidencePacketGenerator:
             Paragraph("<b>ITEMIZED FOLIO & RECONCILIATION AUDIT</b>", s["title"]),
             Paragraph("Accounting ledger as extracted from the uploaded folio, with reconciliation against the bank notice.", s["subtitle"]),
             grid([
+                kv("Folio #:", folio.get("folio_number")) + kv("Confirmation #:", folio.get("confirmation_number"))
+                + kv("Booking:", folio.get("booking_source") or folio.get("booking_channel"), body),
                 kv("Room Number:", folio.get("room_number")) + kv("Arrival Date:", folio.get("check_in"), body)
                 + kv("Departure Date:", folio.get("check_out"), body),
                 kv("Auth Code:", folio.get("auth_code")) + kv("Card Last-4:", f"**** {card_last4}" if card_last4 else None)
@@ -250,7 +258,7 @@ class EvidencePacketGenerator:
 
         line_items = folio.get("line_items") or []
         if line_items:
-            rows = [[Paragraph(f"<b>{h}</b>", bold) for h in ("Date", "Description / Voucher", "Type", "Charges ($)", "Credits ($)")]]
+            rows = [[Paragraph(f"<b>{h}</b>", bold) for h in ("Date", "Description / Voucher", "Category", "Type", "Charges ($)", "Credits ($)")]]
             total_chg = total_crd = 0.0
             for item in line_items:
                 amt = float(item.get("amount") or 0.0)
@@ -261,13 +269,21 @@ class EvidencePacketGenerator:
                     total_chg += amt
                     chg_str, crd_str = _fmt_money(amt), "—"
                 if len(rows) <= MAX_LINE_ITEMS:
-                    rows.append([Paragraph(esc(_or(item.get(k), "—")), body) for k in ("date", "description", "type")]
-                                + [Paragraph(chg_str, body), Paragraph(crd_str, body)])
+                    desc = _or(item.get("description"), "—")
+                    if item.get("reference"):
+                        desc = f"{desc} [{item['reference']}]"
+                    if item.get("disputed") is True:
+                        desc = f"{desc} (DISPUTED)"
+                    rows.append([Paragraph(esc(_or(item.get("date"), "—")), body),
+                                 Paragraph(esc(desc), body),
+                                 Paragraph(esc(_or(item.get("category"), "Other")), body),
+                                 Paragraph(esc(_or(item.get("type"), "—")), body),
+                                 Paragraph(chg_str, body), Paragraph(crd_str, body)])
             omitted = len(line_items) - (len(rows) - 1)
             note = f"Net balance {_fmt_money(total_chg - total_crd)}" + (f" ({omitted} more items in source folio)" if omitted > 0 else "")
-            rows.append([Paragraph("<b>TOTALS</b>", bold), Paragraph(f"<b>{esc(note)}</b>", bold), Paragraph("", bold),
+            rows.append([Paragraph("<b>TOTALS</b>", bold), Paragraph(f"<b>{esc(note)}</b>", bold), Paragraph("", bold), Paragraph("", bold),
                          Paragraph(f"<b>{_fmt_money(total_chg)}</b>", bold), Paragraph(f"<b>{_fmt_money(total_crd)}</b>", bold)])
-            folio_table = Table(rows, colWidths=_cols(70, 242, 60, 80, 80), repeatRows=1)
+            folio_table = Table(rows, colWidths=_cols(62, 212, 62, 52, 72, 72), repeatRows=1)
             folio_table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A8A")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
@@ -295,6 +311,30 @@ class EvidencePacketGenerator:
             Paragraph("<br/>".join(recon_lines) or "No mathematical or identity discrepancies detected.", body),
             "#FFFBEB" if has_issues else "#F0FDF4", AMBER if has_issues else GREEN,
         ))
+        page2.append(Spacer(1, 8))
+
+        proofs = reconciliation.get("proofs") or []
+        if proofs:
+            page2.append(Paragraph(f"<b>Mathematical Proof Summary</b> — {esc(reconciliation.get('proof_summary', ''))}", s["section"]))
+            proof_rows = [[Paragraph(f"<b>{h}</b>", bold) for h in ("Proof", "Result", "Arithmetic / Basis")]]
+            status_style = {"proven": (GREEN, "✓ PROVEN"), "failed": (RED, "✗ FAILED"), "unverifiable": (AMBER, "? UNVERIFIABLE")}
+            for p in proofs:
+                color, label = status_style.get(p.get("status"), (AMBER, str(p.get("status"))))
+                proof_rows.append([
+                    Paragraph(esc(p.get("proof", "").replace("_", " ").title()), body),
+                    Paragraph(f"<font color='{color}'><b>{label}</b></font>", body),
+                    Paragraph(esc(p.get("detail", "")), body),
+                ])
+            proof_table = Table(proof_rows, colWidths=_cols(110, 92, 330))
+            proof_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A8A")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+                ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+            ]))
+            page2.append(proof_table)
 
         # =========================================================================
         # PAGE 3: SUPPORTING EVIDENCE ANNEX & CHAIN OF CUSTODY
@@ -306,16 +346,12 @@ class EvidencePacketGenerator:
                       f"(coverage {int(reconciliation.get('completeness_score') or 0)}%)", s["section"]),
         ]
         chk_rows = [[Paragraph(f"<b>{h}</b>", bold) for h in ("Required Evidence Item", "Status", "Exhibit")]]
-        exhibit_no = 0
+        exhibit_letters = {e.get("spec_id"): f"Exhibit {e.get('letter')}" for e in (reconciliation.get("exhibits") or [])}
         for c in reconciliation.get("evidence_checklist", []):
             present = bool(c.get("present"))
-            exhibit = ""
-            if present:
-                # Same lettering as the rebuttal's exhibit index (A = first available item)
-                exhibit = f"Exhibit {chr(65 + exhibit_no)}" if exhibit_no < 26 else "Attached"
-                exhibit_no += 1
+            exhibit = exhibit_letters.get(c.get("spec_id"), "") if present else ""
             chk_rows.append([
-                Paragraph(esc(c.get("item", "Evidence Item")), body),
+                Paragraph(esc(c.get("item", "Evidence Item")) + (f"<br/><font size='6.5'>{esc(c.get('validation_detail', ''))}</font>" if c.get("validation_detail") else ""), body),
                 Paragraph(f"<font color='{GREEN if present else RED}'><b>{esc(c.get('status'))}</b></font>", body),
                 Paragraph(exhibit or "—", body),
             ])
@@ -328,16 +364,32 @@ class EvidencePacketGenerator:
             ("TOPPADDING", (0, 0), (-1, -1), 2.5),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
         ]))
-        page3 += [chk_table, Spacer(1, 8), Paragraph("<b>Supporting Documents Confirmed by Staff</b>", s["section"])]
+        page3 += [chk_table, Spacer(1, 8), Paragraph("<b>Supporting Documents Collected</b>", s["section"])]
 
-        doc_rows = [[Paragraph(f"<b>{h}</b>", bold) for h in ("Document", "Status")]]
+        evidence_by_type = {i.get("doc_type"): i for i in (reconciliation.get("evidence_items") or [])}
+        doc_rows = [[Paragraph(f"<b>{h}</b>", bold) for h in ("Document", "Status", "File / Provenance")]]
         for key, label in SUPPORTING_DOC_TYPES.items():
+            item = evidence_by_type.get(key) or {}
             on_file = bool(docs.get(key))
+            if on_file and item.get("filename"):
+                status, status_color = "Collected — file attached", GREEN
+                prov = item["filename"]
+                if item.get("sha256"):
+                    prov += f" · SHA-256 {str(item['sha256'])[:12]}…"
+                if item.get("verified_by"):
+                    prov += f" · verified by {item['verified_by']}"
+            elif on_file:
+                status, status_color = "Attested — attach copy", AMBER
+                prov = item.get("source") or "Staff attestation only"
+            else:
+                status, status_color = "Not provided", RED
+                prov = "—"
             doc_rows.append([
                 Paragraph(esc(label), body),
-                Paragraph(f"<font color='{GREEN if on_file else RED}'><b>{'On file — attach copy' if on_file else 'Not provided'}</b></font>", body),
+                Paragraph(f"<font color='{status_color}'><b>{status}</b></font>", body),
+                Paragraph(esc(prov), body),
             ])
-        doc_table = Table(doc_rows, colWidths=_cols(372, 160))
+        doc_table = Table(doc_rows, colWidths=_cols(240, 120, 172))
         doc_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#334155")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
@@ -345,11 +397,22 @@ class EvidencePacketGenerator:
             ("TOPPADDING", (0, 0), (-1, -1), 2),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
         ]))
-        page3 += [doc_table, Spacer(1, 8), Paragraph("<b>Cancellation Policy Disclosed at Booking</b>", s["section"])]
+        page3 += [doc_table, Spacer(1, 8)]
+
+        gaps = reconciliation.get("collection_gaps") or []
+        if gaps:
+            gap_lines = "<br/>".join(
+                f"<font color='{RED if g.get('severity') == 'critical' else AMBER}'><b>[{esc(g.get('severity', 'gap')).upper()}]</b></font> {esc(g.get('message'))}"
+                for g in gaps
+            )
+            page3 += [Paragraph("<b>Collection Gaps to Resolve Before Submission</b>", s["section"]),
+                      _box(Paragraph(gap_lines, body), "#FEF2F2", RED), Spacer(1, 8)]
+
+        page3.append(Paragraph("<b>Cancellation Policy Disclosed at Booking</b>", s["section"]))
 
         if policy_text and policy_text.strip():
             policy_para = f"<i>{esc(policy_text.strip())}</i>"
-        elif docs.get("cancellation_policy_acknowledged"):
+        elif docs.get("cancellation_policy_acceptance"):
             policy_para = "Policy acknowledgement is on file. [Paste the exact policy text shown to the guest at booking before submission.]"
         else:
             policy_para = "No cancellation policy acknowledgement has been confirmed for this reservation."
@@ -357,13 +420,20 @@ class EvidencePacketGenerator:
 
         now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         digest = audit_sha256 or AuditLogger.calculate_sha256((rebuttal_text or "").encode("utf-8"))
-        page3.append(_box(Paragraph(
+        head = chain_head or {}
+        custody_lines = (
             "<b>EVIDENCE INTEGRITY & CHAIN OF CUSTODY</b><br/>"
             f"Compiled: {now_utc} | Rebuttal SHA-256: <font face='Courier'>{esc(digest)}</font><br/>"
-            "The undersigned authorized representative certifies that the records referenced in this packet are true copies "
+            + (f"Approval fingerprint: <font face='Courier'>{esc(str(approval_fingerprint)[:32])}…</font> "
+               f"| Approved by: {esc(_or(approved_by, 'Pending approval'))} at {esc(_or(approved_at, 'Pending approval'))}<br/>" if approval_fingerprint else "")
+            + (f"Audit chain head: <font face='Courier'>{esc(str(head.get('head_hash', ''))[:32])}…</font> "
+               f"({head.get('event_count', 0)} events{', HMAC-protected' if head.get('hmac_protected') else ''})<br/>" if head else "")
+            + (f"Packet SHA-256 (this file, verify after download): <font face='Courier'>{esc(str(packet_sha256)[:32])}…</font><br/>" if packet_sha256 else "")
+            + "The undersigned authorized representative certifies that the records referenced in this packet are true copies "
             "of business records maintained in the ordinary course of hotel operations.<br/><br/>"
-            "Signature: ______________________________ &nbsp;&nbsp; Name / Title: ______________________________",
-            body), "#F1F5F9", "#475569", 1))
+            "Signature: ______________________________ &nbsp;&nbsp; Name / Title: ______________________________"
+        )
+        page3.append(_box(Paragraph(custody_lines, body), "#F1F5F9", "#475569", 1))
 
         story = [_fit_page(page1), PageBreak(), _fit_page(page2), PageBreak(), _fit_page(page3)]
         doc.build(story, canvasmaker=NumberedCanvas)

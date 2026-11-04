@@ -128,6 +128,36 @@ class FolioShieldAPIHandler(BaseHTTPRequestHandler):
                     "pdf_base64": base64.b64encode(pdf_bytes).decode("utf-8")
                 })
 
+            elif path == "/api/v1/submission/bundle":
+                # Expects: {"notice": {...}, "folio": {...}, "packet_base64": "...",
+                #           "exhibits": {"A": "<base64>", ...}, "portal_id": "chase"}
+                notice = body.get("notice", {})
+                folio = body.get("folio", {})
+                packet_bytes = base64.b64decode(body.get("packet_base64", ""))
+                exhibit_files = {k: base64.b64decode(v) for k, v in (body.get("exhibits") or {}).items()}
+                recon = fs.reconcile(notice, folio, supporting_docs=body.get("supporting_docs"))
+                zip_bytes, info = fs.build_submission_bundle(
+                    notice, folio, recon, packet_bytes, exhibit_files,
+                    portal_id=body.get("portal_id", "generic"))
+                self._send_json({
+                    "status": "success",
+                    "bundle_sha256": info["bundle_sha256"],
+                    "filename": info["filename"],
+                    "size_bytes": info["size_bytes"],
+                    "exhibit_map": info["exhibit_map"],
+                    "bundle_base64": base64.b64encode(zip_bytes).decode("utf-8"),
+                })
+
+            elif path == "/api/v1/submission/register":
+                # Expects a SubmissionRecord dict (see core.models)
+                saved = fs.register_submission(body)
+                self._send_json({"status": "success", "data": saved.to_dict()})
+
+            elif path == "/api/v1/submission/outcome":
+                # Expects an OutcomeRecord dict (see core.models)
+                saved = fs.record_outcome(body)
+                self._send_json({"status": "success", "data": saved.to_dict()})
+
             elif path == "/api/v1/dispute/process":
                 # Full end-to-end processing: expects {"notice": {...}, "folio": {...}}
                 # Notice and folio can be dicts or base64 PDF bytes

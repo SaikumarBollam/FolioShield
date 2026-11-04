@@ -37,6 +37,12 @@ logs/*.jsonl
 !samples/*.pdf
 !FolioShield*workflow*.pdf
 
+# Runtime case data (submissions, exhibits, custody records)
+data/submissions/
+
+# Node (tooling only, not part of the Python app)
+node_modules/
+
 # IDE
 .vscode/
 .idea/

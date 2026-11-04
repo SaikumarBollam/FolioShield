@@ -165,8 +165,8 @@ curl -X POST http://localhost:8000/api/v1/reconcile \
     },
     "supporting_docs": {
       "signed_registration_card": true,
-      "emv_chip_or_avs_auth": true,
-      "keycard_or_wifi_audit": true
+      "emv_terminal_receipt": true,
+      "keycard_lock_audit": true
     }
   }'
 ```
@@ -236,9 +236,9 @@ with open("guest_folio.csv", "rb") as f:
 # 2. Programmatically reconcile and calculate completeness score
 recon = fs.reconcile(notice, folio, supporting_docs={
     "signed_registration_card": True,
-    "emv_chip_or_avs_auth": True,
-    "keycard_or_wifi_audit": True,
-    "id_verification_copy": True
+    "emv_terminal_receipt": True,
+    "keycard_lock_audit": True,
+    "id_verification_log": True
 })
 
 # 3. Draft AI Rebuttal

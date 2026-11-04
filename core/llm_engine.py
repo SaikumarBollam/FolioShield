@@ -136,8 +136,12 @@ class LlamaEngine:
                 prompt = self._build_rebuttal_prompt(notice, folio, reconciliation, notes)
                 online_response = self._call_text_model(prompt)
                 if online_response and len(online_response.strip()) > 100:
-                    self.last_engine_used = f"{self.provider}:{self._text_model()}"
-                    return online_response.strip()
+                    from .rebuttal_validator import validate_rebuttal
+                    verdict = validate_rebuttal(online_response, reconciliation, notice)
+                    if verdict["valid"]:
+                        self.last_engine_used = f"{self.provider}:{self._text_model()}"
+                        return online_response.strip()
+                    logger.warning("Llama draft failed validation (%s); using template.", "; ".join(verdict["issues"][:4]))
             except (requests.RequestException, KeyError, IndexError, ValueError) as e:
                 logger.warning("Online inference failed (%s); using offline template.", e)
 
@@ -165,6 +169,128 @@ class LlamaEngine:
             document_type,
             "No vision provider configured. Image stored as an exhibit but not machine-analyzed; verify manually.",
         )
+
+    def draft_supplemental_rebuttal(
+        self,
+        notice: Dict[str, Any],
+        folio: Dict[str, Any],
+        recon: Dict[str, Any],
+        prior_round: Dict[str, Any],
+        loss: Optional[Dict[str, Any]] = None,
+        custom_instructions: Optional[str] = None,
+    ) -> str:
+        """
+        Pre-arbitration / second-chargeback supplemental letter: references the
+        prior submission, answers the issuer's stated objection, and presents
+        ONLY the new/strengthened exhibits (letters continue the round-1 index).
+        Deterministic template — supplemental filings are too consequential
+        for unvalidated free generation.
+        """
+        notes = self._clean_notes(custom_instructions)
+        hotel = _value(folio, "hotel_name", "[MERCHANT NAME]")
+        case_id = _value(notice, "case_id", "[CASE ID]")
+        network = _value(notice, "card_network", "[NETWORK]")
+        code = _value(notice, "reason_code", "[REASON CODE]")
+        disp_amt = float(notice.get("disputed_amount") or 0.0)
+        currency = notice.get("currency") or "USD"
+        arn = _value(notice, "arn", "[ARN]")
+        contact = config.hotel_contact_email or "the merchant disputes contact on file"
+
+        prior_sub = (prior_round or {}).get("submission") or {}
+        prior_exhibits = (prior_round or {}).get("exhibits") or []
+        current_exhibits = recon.get("exhibits") or []
+        prior_specs = {e.get("spec_id") for e in prior_exhibits}
+        new_exhibits = [e for e in current_exhibits if e.get("spec_id") not in prior_specs]
+
+        # Continued lettering: round-2 exhibits keep their reconciler letters,
+        # which already continue the index when prior letters are supplied.
+        loss_label = (loss or {}).get("loss_reason_label") or "evidence found insufficient"
+        issuer_text = (loss or {}).get("issuer_text") or "[issuer reason not recorded]"
+
+        prior_ref = (
+            f"submitted on {(prior_sub.get('submitted_at') or '[date]')[:10]}"
+            + (f" via {prior_sub.get('portal_name') or prior_sub.get('portal_id')}" if prior_sub.get("portal_id") else "")
+            + (f", portal confirmation {prior_sub.get('confirmation_reference')}" if prior_sub.get("confirmation_reference") else "")
+            + (f" (bundle SHA-256 {str(prior_sub.get('bundle_sha256'))[:16]}…)" if prior_sub.get("bundle_sha256") else "")
+        )
+        new_lines = [
+            f"- EXHIBIT {e.get('letter')}: {e.get('label')} [{'attached' if e.get('file_backed') else 'on file'}"
+            + (f" — file: {e['filename']}" if e.get("filename") else "")
+            + (f" — SHA-256 {str(e['sha256'])[:12]}…" if e.get("sha256") else "") + "]"
+            for e in new_exhibits
+        ] or ["- [No new exhibits collected yet — complete the gap checklist in the supplemental workspace.]"]
+        still_open = [c for c in (recon.get("evidence_checklist") or []) if c.get("validation") in ("missing", "weak", "adverse")]
+        open_lines = [f"- [MISSING: {c.get('item')} — {c.get('validation_detail')}]" for c in still_open]
+
+        return f"""SUPPLEMENTAL REPRESENTMENT — PRE-ARBITRATION / ESCALATION RESPONSE
+{hotel}
+Submitted to the Acquirer / Processor Chargeback Department
+
+Date: {date.today().strftime('%B %d, %Y')}
+Re: Case Reference Number: {case_id} | ARN: {arn}
+Card Network / Reason Code: {network} {code} | Disputed Amount: ${disp_amt:,.2f} {currency}
+Prior Submission: {prior_ref}
+
+Dear Chargeback Analyst,
+
+1. EXECUTIVE SUMMARY
+{hotel} respectfully submits this supplemental response for Case {case_id} (ARN {arn}). Our original representment was {prior_ref}. The issuer's determination cited: {loss_label} — "{issuer_text}". This supplement answers that determination directly with the new and strengthened evidence indexed below, and renews our request for reversal of ${disp_amt:,.2f} {currency}.
+
+2. RESPONSE TO THE ISSUER'S DETERMINATION
+Issuer's stated basis: {loss_label}.
+"{issuer_text}"
+
+The merchant's supplemental facts (new evidence only; round-1 exhibits are incorporated by reference and not re-argued):
+{chr(10).join(f'- {e.get("label")}' for e in new_exhibits) or '- [No new exhibits collected yet.]'}
+
+3. CHRONOLOGY (SUPPLEMENTAL EVENTS)
+- Prior representment {prior_ref}.
+- Issuer determination received: {loss_label}.
+- Supplemental evidence collected and validated as indexed in section 4.
+{f'- Additional merchant clarification: {notes}' if notes else ''}
+
+4. INDEX OF NEW / STRENGTHENED EXHIBITS (letters continue the round-1 index A–{prior_exhibits[-1].get('letter') if prior_exhibits else '—'})
+{chr(10).join(new_lines)}
+{chr(10).join(['', 'Outstanding items:', *open_lines]) if open_lines else ''}
+
+5. CLOSING & REQUEST FOR REVERSAL
+For the reasons above and in our original submission, {hotel} respectfully requests reversal of ${disp_amt:,.2f} {currency} for Case {case_id} (ARN {arn}). The records cited are true copies of business records maintained in the ordinary course of hotel operations. Questions may be directed to {contact}.
+
+Respectfully submitted,
+Finance & Revenue Protection Department
+{hotel}
+"""
+
+    def extract_text_from_image(self, image_bytes: bytes) -> Optional[str]:
+        """
+        OCR-style text extraction for scanned documents (e.g. image-only dispute
+        notices) using the vision model. Returns recognized text, or None when no
+        provider is configured / the model returns nothing usable.
+        """
+        if not self.is_api_configured():
+            return None
+        try:
+            b64_img = base64.b64encode(image_bytes).decode("utf-8")
+            data = self._post({
+                "model": self._vision_model(),
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": (
+                            "Transcribe ALL text visible in this document image exactly as written, "
+                            "preserving labels, dates, amounts, and reference numbers. Return only the transcription."
+                        )},
+                        {"type": "image_url", "image_url": {"url": f"data:{_image_mime(image_bytes)};base64,{b64_img}"}},
+                    ],
+                }],
+                "temperature": 0.0,
+                "max_tokens": 3000,
+            })
+            content = data["choices"][0]["message"]["content"]
+            return content.strip() if content and content.strip() else None
+        except (requests.RequestException, KeyError, IndexError, ValueError) as e:
+            logger.warning("Vision OCR failed: %s", e)
+            return None
 
     # ------------------------------------------------------------------ provider calls
 
@@ -257,10 +383,22 @@ class LlamaEngine:
     def _available_and_missing(recon: Dict[str, Any]) -> Dict[str, List[str]]:
         checklist = recon.get("evidence_checklist") or []
         docs = recon.get("supporting_docs") or {}
+        items = {i.get("doc_type"): i for i in (recon.get("evidence_items") or [])}
+        confirmed: List[str] = []
+        for key, label in SUPPORTING_DOC_TYPES.items():
+            if not docs.get(key):
+                continue
+            item = items.get(key) or {}
+            if item.get("filename"):
+                confirmed.append(f"{label} (file: {item['filename']})")
+            else:
+                confirmed.append(label)
+        exhibits = [e.get("label") for e in (recon.get("exhibits") or []) if e.get("label")]
         return {
-            "available": [c["item"] for c in checklist if c.get("present")],
+            "available": exhibits or [c["item"] for c in checklist if c.get("present")],
             "missing": [c["item"] for c in checklist if not c.get("present")],
-            "confirmed_docs": [label for key, label in SUPPORTING_DOC_TYPES.items() if docs.get(key)],
+            "confirmed_docs": confirmed,
+            "exhibits": exhibits,
         }
 
     def _build_rebuttal_prompt(
@@ -278,6 +416,18 @@ class LlamaEngine:
             f"{i.get('date') or '-'} | {i.get('description')} | {i.get('type')} | ${float(i.get('amount') or 0):,.2f}"
             for i in (folio.get("line_items") or [])[:40]
         ]
+        from .chronology import build_chronology
+        evidence_by_type = {i.get("doc_type"): i for i in (recon.get("evidence_items") or [])}
+        chrono = build_chronology(notice, folio, evidence_by_type, recon)
+        chrono_lines = [f"{e['date_label']} — {e['event']}" for e in chrono["events"]]
+        verdict_lines = [
+            f"{c.get('item')}: {c.get('validation')} — {c.get('validation_detail')}"
+            for c in (recon.get("evidence_checklist") or [])
+        ]
+        exhibit_lines = [
+            f"Exhibit {e.get('letter')}: {e.get('label')}"
+            for e in (recon.get("exhibits") or [])
+        ]
 
         def bullets(values: List[str]) -> str:
             return "\n".join(f"- {v}" for v in values) if values else "- None"
@@ -285,44 +435,49 @@ class LlamaEngine:
         return f"""Draft a dispute representment rebuttal letter for the hospitality chargeback below.
 
 <case_data>
-Merchant: {_value(folio, 'hotel_name', '[MERCHANT NAME]')}
-Case ID: {_value(notice, 'case_id', '[CASE ID]')}
+Merchant: {_value(folio, 'hotel_name', '[MERCHANT NAME]')} | Merchant ID (MID): {_value(folio, 'merchant_id', _value(notice, 'merchant_id', '[MID]'))}
+Case ID: {_value(notice, 'case_id', '[CASE ID]')} | ARN: {_value(notice, 'arn', '[ARN]')} | Dispute stage: {_value(notice, 'dispute_stage', 'chargeback')}
 Card Network & Reason Code: {_value(notice, 'card_network', '[NETWORK]')} {code} ({rule_meta.get('name', 'reason code not in knowledge base')})
-Network win strategy: {rule_meta.get('win_strategy', 'n/a')}
+Cardholder's actual claim (from the notice): {_value(notice, 'claim_statement', '[CLAIM STATEMENT NOT COLLECTED]')}
 Disputed Amount: ${float(notice.get('disputed_amount') or 0):,.2f} {notice.get('currency') or 'USD'}
 Total Folio Charges: ${float(folio.get('total_charges') or 0):,.2f}
 Total Folio Payments: ${float(folio.get('total_payments') or 0):,.2f}
 Card Last 4: {_value(folio, 'card_last_4', _value(notice, 'card_last_4', '[UNKNOWN]'))}
 Registered Guest: {_value(folio, 'guest_name', '[UNKNOWN]')} | Cardholder on notice: {_value(notice, 'cardholder_name', '[UNKNOWN]')}
+Booking: {_value(folio, 'booking_source', _value(folio, 'booking_channel', '[CHANNEL UNKNOWN]'))} | Confirmation #: {_value(folio, 'confirmation_number', _value(folio, 'folio_number', '[UNKNOWN]'))} | Stay status: {_value(folio, 'stay_status', 'occupied')}
 Stay: {_value(folio, 'check_in', '[UNKNOWN]')} to {_value(folio, 'check_out', '[UNKNOWN]')} | Room: {_value(folio, 'room_number', '[UNKNOWN]')}
-Authorization Code: {_value(folio, 'auth_code', '[UNKNOWN]')}
+Authorization Code: {_value(folio, 'auth_code', '[UNKNOWN]')} | AVS: {_value(folio, 'avs_result', '[UNKNOWN]')} | CVV: {_value(folio, 'cvv_result', '[UNKNOWN]')} | 3-D Secure: {_value(folio, 'three_ds_status', '[UNKNOWN]')} (ECI {_value(folio, 'three_ds_eci', '-')}) | Entry mode: {_value(folio, 'entry_mode', '[UNKNOWN]')}
+Refund already issued: ${float(folio.get('refund_amount') or 0):,.2f} {_value(folio, 'refund_date', '')} {_value(folio, 'refund_reference', '')}
 
 Folio line items:
 {bullets(items)}
 
-Reconciliation findings:
-{bullets(recon.get('audit_highlights', []))}
+Chronology (use exactly these events, in this order, in section 3):
+{bullets(chrono_lines)}
+
+Evidence validation verdicts (satisfied = may assert; weak/missing = mark [MISSING: item]; adverse = NEVER cite as support, address head-on):
+{bullets(verdict_lines)}
+
+Mathematical proofs (status: arithmetic):
+{bullets([f"{p.get('proof')}: {p.get('status')} — {p.get('detail')}" for p in (recon.get('proofs') or [])])}
 Discrepancies / flags:
 {bullets(discrepancies)}
 
-Evidence confirmed AVAILABLE by staff:
-{bullets(ev['available'])}
-Supporting documents confirmed on file:
-{bullets(ev['confirmed_docs'])}
-Evidence MISSING (do not claim these exist):
-{bullets(ev['missing'])}
+Exhibit index (cite ONLY these letters, exactly as assigned):
+{bullets(exhibit_lines)}
 </case_data>
 
 <reviewer_notes>
 {notes or 'None provided.'}
 </reviewer_notes>
 
-Structure the letter as:
-1. Executive summary
-2. Rebuttal of the cardholder claim addressing reason code {code}
-3. Chronological transaction and occupancy facts (only those listed above)
-4. Index of available exhibits, and a list of any missing items
-5. Closing request for reversal
+Write the letter with EXACTLY these five numbered sections:
+1. EXECUTIVE SUMMARY — one paragraph: the claim, our position, the amount, what we ask.
+2. FACTUAL REBUTTAL — answer the cardholder's actual claim point by point; cite exhibits inline as (Exhibit X); mark every unproven element as [MISSING: <item>]; never assert evidence marked adverse/weak/missing.
+3. CHRONOLOGY OF THE TRANSACTION — the chronology events above, in order.
+4. INDEX OF EXHIBITS — the exhibit index above, letter for letter.
+5. CLOSING & REQUEST FOR REVERSAL — restate amount, currency, Case ID and ARN; specific ask (reverse / deny double recovery / uphold fee as applicable).
+Include the Case ID and ARN in the letter. Do not invent any fact, timestamp, or exhibit.
 """
 
     def _generate_rule_based_rebuttal(
@@ -335,6 +490,9 @@ Structure the letter as:
         docs = recon.get("supporting_docs") or {}
         ev = self._available_and_missing(recon)
         rule_info = recon.get("rule_details") or {}
+        exhibits = recon.get("exhibits") or []
+        readiness = recon.get("evidence_readiness") or {}
+        checklist = recon.get("evidence_checklist") or []
 
         hotel = _value(folio, "hotel_name", "[MERCHANT NAME]")
         guest = _value(folio, "guest_name", _value(notice, "cardholder_name", "[GUEST NAME]"))
@@ -349,65 +507,161 @@ Structure the letter as:
         check_out = _value(folio, "check_out", "[CHECK-OUT DATE]")
         room_num = _value(folio, "room_number", "[ROOM]")
         code_name = rule_info.get("name", "Cardholder Dispute")
-        strategy = rule_info.get("win_strategy", "Prove legitimate delivery of lodging services and cardholder authorization.")
+        claim = _value(notice, "claim_statement", "[CLAIM STATEMENT NOT COLLECTED]")
+        arn = _value(notice, "arn", "[ARN]")
+        mid = _value(folio, "merchant_id", _value(notice, "merchant_id", "[MID]"))
+        currency = notice.get("currency") or "USD"
+        refund_amt = float(folio.get("refund_amount") or 0.0)
+        stay_status = (folio.get("stay_status") or "occupied").strip().lower()
+        settlement_state = recon.get("settlement_state") or ""
+        contact = config.hotel_contact_email or "the merchant disputes contact on file"
 
-        facts: List[str] = []
-        if docs.get("id_verification_copy"):
-            facts.append(f"Identity Verification: At check-in on {check_in}, front-desk staff verified government-issued photo ID for the registered guest '{guest}'.")
-        if docs.get("signed_registration_card"):
-            facts.append("Signed Registration: The guest signed the registration card / digital check-in acknowledging rates and terms.")
-        if docs.get("emv_chip_or_avs_auth") or folio.get("auth_code"):
-            auth_detail = " with EMV / AVS verification on file" if docs.get("emv_chip_or_avs_auth") else ""
-            facts.append(f"Card Authorization: Authorization code {auth_code} was obtained for the card ending in {last4}{auth_detail}.")
-        if docs.get("keycard_or_wifi_audit"):
-            facts.append(f"Occupancy: Electronic keycard records for Room #{room_num} show guest access during the stay ({check_in} through {check_out}).")
-        if docs.get("cancellation_policy_acknowledged"):
-            facts.append("Policy Disclosure: The cancellation / no-show policy was disclosed and acknowledged at booking.")
-        if docs.get("booking_confirmation"):
-            facts.append("Booking Confirmation: A reservation confirmation was sent to the guest's contact on file.")
-        if folio_tot > 0:
-            facts.append(f"Itemized Folio: Room night charges, applicable taxes, and incidentals total ${folio_tot:,.2f}.")
+        letter_of: Dict[str, str] = {}
+        for e in exhibits:
+            if e.get("spec_id"):
+                letter_of[e["spec_id"]] = e.get("letter") or ""
 
-        facts_block = "\n".join(f"- {f}" for f in facts) or "- [No supporting facts confirmed yet — complete the evidence checklist.]"
-        exhibits = "\n".join(f"- EXHIBIT {chr(65 + i)}: {item}" for i, item in enumerate(ev["available"])) or "- [No exhibits confirmed]"
-        missing_block = (
-            "\nOUTSTANDING ITEMS (to be supplied before submission):\n" + "\n".join(f"- [MISSING: {m}]" for m in ev["missing"]) + "\n"
-            if ev["missing"] else ""
-        )
-        notes_block = f"\nADDITIONAL MERCHANT CLARIFICATION:\n{notes}\n" if notes else ""
-        partial_note = (
-            f" The cardholder disputes ${disp_amt:,.2f} of a ${folio_tot:,.2f} folio; the remaining charges are uncontested."
-            if recon.get("is_partial") else ""
-        )
+        def cite(*spec_ids: str) -> str:
+            letters = [letter_of[s] for s in spec_ids if letter_of.get(s)]
+            return f" (Exhibit {', '.join(letters)})" if letters else ""
 
-        return f"""DISPUTE REPRESENTMENT & REBUTTAL DECLARATION
-MERCHANT: {hotel}
-ACQUIRER / PROCESSOR DISPUTE DIVISION
+        # ---- Chronology (Phase 4) -------------------------------------------
+        from .chronology import build_chronology
+        evidence_by_type = {i.get("doc_type"): i for i in (recon.get("evidence_items") or [])}
+        chrono = build_chronology(notice, folio, evidence_by_type, recon)
+        chrono_lines = [f"- {e['date_label']} — {e['event']} [{e['source']}]" for e in chrono["events"]]
+        for anchor in chrono["missing_anchors"]:
+            chrono_lines.append(f"- [MISSING: {anchor}]")
+        chronology_block = "\n".join(chrono_lines) or "- [MISSING: chronology — no dated facts collected]"
+
+        # ---- Section 1: Executive summary (claim/outcome-aware) --------------
+        if refund_amt > 0 and abs(refund_amt - disp_amt) < 0.01:
+            summary = (
+                f"{hotel} requests denial of this chargeback as a double recovery. The cardholder's claim — \"{claim}\" — "
+                f"is answered by the merchant's own records: a refund of ${refund_amt:,.2f} {currency} was already issued"
+                + (f" on {folio.get('refund_date')}" if folio.get("refund_date") else "")
+                + (f" (reference {folio.get('refund_reference')})" if folio.get("refund_reference") else "")
+                + f" for this exact transaction (Case {case_id}, ARN {arn}). The processor credit receipt is attached"
+                + cite("refund_receipt") + ". Reversing this chargeback in the cardholder's favor would pay the same amount twice."
+            )
+            closing_ask = (f"deny this chargeback and close Case {case_id} in the merchant's favor, as the cardholder has already "
+                           f"been refunded ${refund_amt:,.2f} {currency} (ARN {arn})")
+        elif stay_status == "no_show":
+            summary = (
+                f"{hotel} contests the chargeback of ${disp_amt:,.2f} {currency} under {network} Reason Code {code} ({code_name}). "
+                f"The cardholder's claim — \"{claim}\" — concerns a guaranteed reservation that was held for the guest and not used. "
+                f"The fee was assessed strictly under the cancellation/no-show policy accepted at booking" + cite("policy", "policy_noshow")
+                + f"; the room was held past the check-in cutoff on {check_in}. The evidence index below documents the guarantee, the policy acceptance, and the charge."
+            )
+            closing_ask = f"reverse this chargeback and re-credit ${disp_amt:,.2f} {currency} to {hotel} (Case {case_id}, ARN {arn})"
+        elif stay_status == "cancelled":
+            summary = (
+                f"{hotel} contests the chargeback of ${disp_amt:,.2f} {currency} under {network} Reason Code {code} ({code_name}). "
+                f"The cardholder's claim — \"{claim}\" — is answered by the booking and cancellation record: the reservation was cancelled"
+                + (f" at {folio.get('cancellation_timestamp')}" if folio.get("cancellation_timestamp") else "")
+                + f", and the charge follows the policy accepted at booking" + cite("policy") + "."
+            )
+            closing_ask = f"reverse this chargeback and re-credit ${disp_amt:,.2f} {currency} to {hotel} (Case {case_id}, ARN {arn})"
+        elif recon.get("is_partial"):
+            disputed_desc = "; ".join(
+                f"{i.get('description')} (${float(i.get('amount') or 0):,.2f})"
+                for i in (recon.get("disputed_line_items") or []) if i.get("type") == "Charge") or "the contested folio lines"
+            summary = (
+                f"{hotel} contests the partial chargeback of ${disp_amt:,.2f} {currency} (of a ${folio_tot:,.2f} folio) under "
+                f"{network} Reason Code {code} ({code_name}). The cardholder's claim — \"{claim}\" — contests: {disputed_desc}. "
+                f"Each contested line is proven below by its signed slip / usage record" + cite("pos_slips_per_item")
+                + f"; the remaining ${folio_tot - disp_amt:,.2f} of the folio is uncontested and was settled by the same card."
+            )
+            closing_ask = f"reverse this partial chargeback and re-credit ${disp_amt:,.2f} {currency} to {hotel} (Case {case_id}, ARN {arn})"
+        else:
+            summary = (
+                f"{hotel} contests the chargeback of ${disp_amt:,.2f} {currency} under {network} Reason Code {code} ({code_name}). "
+                f"The cardholder's claim — \"{claim}\" — is contradicted by the merchant's records: the registered guest checked in"
+                + (f" at {folio.get('check_in_time')}" if folio.get("check_in_time") else "")
+                + f" on {check_in}, presented photo ID, signed the registration, occupied Room {room_num} for "
+                + (f"{chrono['nights']} night(s)" if chrono.get("nights") else "the booked stay")
+                + f", and settled the folio in full with the card ending in {last4} (authorization {auth_code}). "
+                f"Each fact is tied to an exhibit below."
+            )
+            closing_ask = f"reverse this chargeback and re-credit ${disp_amt:,.2f} {currency} to {hotel} (Case {case_id}, ARN {arn})"
+
+        # ---- Section 2: Factual rebuttal (validator-sourced) ------------------
+        spec_facts: List[str] = []
+        adverse_lines: List[str] = []
+        missing_lines: List[str] = []
+        for entry in checklist:
+            validation = entry.get("validation")
+            detail = entry.get("validation_detail") or ""
+            label = entry.get("item")
+            if validation == "satisfied":
+                spec_id = entry.get("spec_id") or ""
+                spec_facts.append(f"- {label}: {detail}{cite(spec_id)}")
+            elif validation == "adverse":
+                adverse_lines.append(f"- {label}: {detail} The merchant does not rely on this item.")
+            elif validation == "weak":
+                missing_lines.append(f"- [MISSING: {label} — collected but not yet proven: {detail}]")
+            else:
+                missing_lines.append(f"- [MISSING: {label}]")
+
+        proof_lines = [
+            f"- {p.get('proof')}: {p.get('detail')}"
+            for p in (recon.get("proofs") or []) if p.get("status") == "proven"
+            and p.get("proof") in ("folio_footing", "rate_recomputation", "settlement", "amount", "card_last4", "disputed_scope")
+        ]
+
+        rebuttal_parts = [
+            f"The cardholder states: \"{claim}\"",
+            f"Applicable standard: {network} {code} — {code_name}. {rule_info.get('win_strategy', '')}",
+            "",
+            "Facts established by the attached evidence:",
+            *(spec_facts or ["- [No evidence has been validated yet — complete evidence collection in Tab 2.]"]),
+        ]
+        if proof_lines:
+            rebuttal_parts += ["", "Mathematical verification (Phase 2 proofs):", *proof_lines]
+        if adverse_lines:
+            rebuttal_parts += ["", "Matters addressed directly (not relied upon as support):", *adverse_lines]
+        if missing_lines:
+            rebuttal_parts += ["", "Outstanding items (to be supplied before submission):", *missing_lines]
+        if notes:
+            rebuttal_parts += ["", f"Additional merchant clarification: {notes}"]
+        rebuttal_block = "\n".join(rebuttal_parts)
+
+        # ---- Section 4: Exhibit index -----------------------------------------
+        exhibit_lines = []
+        for e in exhibits:
+            status = "attached" if e.get("file_backed") else "on file"
+            fn = f" — file: {e['filename']}" if e.get("filename") else ""
+            sha = f" — SHA-256 {str(e['sha256'])[:12]}…" if e.get("sha256") else ""
+            exhibit_lines.append(f"- EXHIBIT {e.get('letter')}: {e.get('label')} [{status}{fn}{sha}]")
+        exhibits_block = "\n".join(exhibit_lines) or "- [No exhibits confirmed]"
+
+        return f"""DISPUTE REPRESENTMENT & REBUTTAL
+{hotel}
+Submitted to the Acquirer / Processor Chargeback Department
 
 Date: {date.today().strftime('%B %d, %Y')}
-Case Reference Number: {case_id}
-Card Network: {network}
-Dispute Reason Code: {code} — {code_name}
-Disputed Amount: ${disp_amt:,.2f} USD
-Original Folio Total: ${folio_tot:,.2f} USD
-Account Number: **** **** **** {last4}
-Registered Guest Name: {guest}
-Reservation / Room: #{room_num} | Stay Dates: {check_in} to {check_out}
-Authorization Code: {auth_code}
+Re: Case Reference Number: {case_id} | ARN: {arn} | Merchant ID (MID): {mid}
+Card Network / Reason Code: {network} {code} — {code_name}
+Disputed Amount: ${disp_amt:,.2f} {currency} | Original Folio Total: ${folio_tot:,.2f} {currency}
+Account Number: **** **** **** {last4} | Registered Guest: {guest} | Room: {room_num} | Stay: {check_in} to {check_out}
+Response Deadline: {_value(notice, 'response_deadline', '[DEADLINE]')}
 
-1. EXECUTIVE STATEMENT
-{hotel} contests the chargeback of ${disp_amt:,.2f} initiated under {network} Reason Code {code}.{partial_note} The merchant's records, summarized below and attached as exhibits, support that the services were authorized and provided.
+Dear Chargeback Analyst,
 
-2. CARD-NETWORK DEFENSE & FACTUAL REBUTTAL
-Network strategy: {strategy}
+1. EXECUTIVE SUMMARY
+{summary}
 
-{facts_block}
+2. FACTUAL REBUTTAL — {network} {code} ({code_name})
+{rebuttal_block}
 
-3. SUMMARY OF ATTACHED EVIDENCE EXHIBITS
-{exhibits}
-{missing_block}{notes_block}
-4. CLOSING & REQUEST FOR CHARGEBACK REVERSAL
-Based on the evidence above, we respectfully request that this chargeback be reversed and the disputed amount of ${disp_amt:,.2f} be re-credited to {hotel}.
+3. CHRONOLOGY OF THE TRANSACTION
+{chronology_block}
+
+4. INDEX OF EXHIBITS
+{exhibits_block}
+
+5. CLOSING & REQUEST FOR REVERSAL
+Based on the foregoing facts and the attached exhibits, {hotel} respectfully requests that the processor {closing_ask}. The records cited above are true copies of business records maintained in the ordinary course of hotel operations. Questions may be directed to {contact}.
 
 Respectfully submitted,
 Finance & Revenue Protection Department
