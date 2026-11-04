@@ -92,19 +92,164 @@ st.set_page_config(
 st.markdown("""
 <style>
     :root {
+        /* Three-Toned Blue Palette */
+        /* Tone 1: Deep Navy Blue (Headings & Authority Elements) */
+        --fs-tone-1: #1E3A8A;
         --fs-primary: #1E3A8A;
+
+        /* Tone 2: True Royal Blue (Subheadings, Accent Borders & Interactive Elements) */
+        --fs-tone-2: #2563EB;
         --fs-accent: #2563EB;
+
+        /* Tone 3: Soft Mist / Ice Tint Blue (Panels, Hover Highlights & Surfaces) */
+        --fs-tone-3: #EFF6FF;
+        --fs-tone-3-border: #BFDBFE;
+        --fs-badge-bg: #DBEAFE;
+        --fs-badge-text: #1E40AF;
+
         --fs-bg: #FFFFFF;
         --fs-text: #0F172A;
-        --fs-font: sans-serif;
-        --fs-radius: 6px;
+        --fs-text-muted: #1E3A8A;
+        --fs-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        --fs-radius: 8px;
     }
-    .main-header { font-size: 2.2rem; font-weight: 700; color: var(--fs-primary); margin-bottom: 0px; font-family: var(--fs-font); }
-    .sub-header { font-size: 1.05rem; color: #475569; margin-bottom: 20px; }
-    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
-    .stTabs [data-baseweb="tab"] { padding: 10px 18px; border-radius: var(--fs-radius) var(--fs-radius) 0px 0px; font-weight: 600; }
-    .badge { display: inline-block; padding: 3px 8px; font-size: 12px; font-weight: 600;
-             border-radius: 4px; background-color: #DBEAFE; color: #1E40AF; }
+
+    /* Headings — Tone 1 (Deep Navy Blue) */
+    .main-header, h1, .stMarkdown h1 {
+        font-size: 2.2rem !important;
+        font-weight: 700 !important;
+        color: var(--fs-tone-1) !important;
+        margin-bottom: 4px !important;
+        font-family: var(--fs-font) !important;
+        letter-spacing: -0.015em;
+    }
+    h2, .stMarkdown h2 {
+        font-size: 1.45rem !important;
+        font-weight: 700 !important;
+        color: var(--fs-tone-1) !important;
+        border-bottom: 2px solid var(--fs-tone-3-border) !important;
+        padding-bottom: 6px !important;
+        margin-top: 18px !important;
+        margin-bottom: 12px !important;
+    }
+
+    /* Subheadings — Tone 2 (Royal Blue) */
+    .sub-header, p.sub-header {
+        font-size: 1.05rem !important;
+        font-weight: 500 !important;
+        color: var(--fs-tone-2) !important;
+        margin-bottom: 22px !important;
+        line-height: 1.5 !important;
+    }
+    h3, .stMarkdown h3, [data-testid="stSubheader"] {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        color: var(--fs-tone-2) !important;
+        margin-top: 16px !important;
+        margin-bottom: 8px !important;
+    }
+    h4, .stMarkdown h4 {
+        font-size: 1.08rem !important;
+        font-weight: 600 !important;
+        color: var(--fs-tone-2) !important;
+        margin-top: 12px !important;
+        margin-bottom: 6px !important;
+    }
+    h5, .stMarkdown h5 {
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
+        color: var(--fs-tone-2) !important;
+        margin-top: 10px !important;
+        margin-bottom: 4px !important;
+    }
+
+    /* Three-Toned Containers & Metric Cards (Tone 3 Surface) */
+    div[data-testid="stMetric"] {
+        background-color: var(--fs-tone-3) !important;
+        border: 1px solid var(--fs-tone-3-border) !important;
+        border-radius: var(--fs-radius) !important;
+        padding: 12px !important;
+    }
+    div[data-testid="stMetric"] label, div[data-testid="stMetric"] [data-testid="stMetricLabel"] {
+        color: var(--fs-tone-2) !important;
+        font-weight: 600 !important;
+    }
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+        color: var(--fs-tone-1) !important;
+        font-weight: 700 !important;
+    }
+    div[data-testid="stExpander"] {
+        border: 1px solid var(--fs-tone-3-border) !important;
+        border-radius: var(--fs-radius) !important;
+        background-color: #FFFFFF !important;
+    }
+
+    /* Tabs Styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 6px;
+        border-bottom: 2px solid var(--fs-tone-3-border);
+    }
+    .stTabs [data-baseweb="tab"] {
+        padding: 10px 18px;
+        border-radius: var(--fs-radius) var(--fs-radius) 0px 0px;
+        font-weight: 600;
+        color: var(--fs-tone-1);
+    }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        background-color: var(--fs-tone-3) !important;
+        color: var(--fs-tone-1) !important;
+        border-bottom: 3px solid var(--fs-tone-2) !important;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: var(--fs-tone-3);
+        color: var(--fs-tone-2);
+    }
+
+    /* Badges & Chips */
+    .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: 4px;
+        background-color: var(--fs-badge-bg);
+        color: var(--fs-badge-text);
+        border: 1px solid var(--fs-tone-3-border);
+    }
+
+    /* Primary and Secondary Buttons */
+    .stButton > button[kind="primary"] {
+        background-color: var(--fs-tone-1) !important;
+        border-color: var(--fs-tone-1) !important;
+        color: #FFFFFF !important;
+        border-radius: var(--fs-radius) !important;
+        font-weight: 600 !important;
+    }
+    .stButton > button[kind="primary"]:hover {
+        background-color: var(--fs-tone-2) !important;
+        border-color: var(--fs-tone-2) !important;
+    }
+    .stButton > button:not([kind="primary"]) {
+        border: 1px solid var(--fs-tone-3-border) !important;
+        border-radius: var(--fs-radius) !important;
+        color: var(--fs-tone-1) !important;
+    }
+    .stButton > button:not([kind="primary"]):hover {
+        background-color: var(--fs-tone-3) !important;
+        border-color: var(--fs-tone-2) !important;
+        color: var(--fs-tone-2) !important;
+    }
+
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        background-color: #F8FAFD !important;
+        border-right: 1px solid var(--fs-tone-3-border) !important;
+    }
+    section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {
+        color: var(--fs-tone-1) !important;
+        border-bottom: none !important;
+    }
+
     .fs-brand-logo { max-height: 44px; margin-bottom: 6px; }
 </style>
 """, unsafe_allow_html=True)

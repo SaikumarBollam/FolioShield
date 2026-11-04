@@ -88,8 +88,8 @@ class HostTheme:
             --fs-radius: {self.border_radius};
         }}
         html, body, [class*="css"] {{ font-family: var(--fs-font); }}
-        .main-header {{ color: var(--fs-primary) !important; font-family: var(--fs-font); }}
-        .sub-header {{ color: var(--fs-text); }}
+        .main-header, h1, h2, .stMarkdown h1, .stMarkdown h2 {{ color: var(--fs-primary) !important; font-family: var(--fs-font); }}
+        .sub-header, p.sub-header, h3, h4, h5, .stMarkdown h3, .stMarkdown h4, .stMarkdown h5, [data-testid="stSubheader"] {{ color: var(--fs-accent) !important; }}
         .stTabs [data-baseweb="tab"] {{ border-radius: var(--fs-radius) var(--fs-radius) 0 0; }}
         .stButton > button[kind="primary"] {{ background-color: var(--fs-primary); border-color: var(--fs-primary); border-radius: var(--fs-radius); }}
         .stDownloadButton > button {{ border-radius: var(--fs-radius); }}
