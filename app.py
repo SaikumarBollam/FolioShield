@@ -757,19 +757,13 @@ with tab_ingest:
                         st.info("No changes to save.")
 
     if not _ui_state.has_case_data(st.session_state):
-        st.info(" **No dispute notice or guest folio uploaded yet.** Upload the bank dispute notice and guest folio above to extract case data and check for collection gaps.")
+        st.info("**No dispute notice or guest folio uploaded yet.** Upload the bank dispute notice and guest folio above to extract case data and check for collection gaps.")
     elif case_touched and collection_gaps:
         st.markdown("#### Collection Gaps")
         for gap in collection_gaps:
             render = st.error if gap.get("severity") == "critical" else st.warning
             render(f"**{gap.get('field')}:** {gap.get('message')}")
 
-    st.markdown("---")
-    st.info(
-        "**Looking for the scan/signature check?** It now lives with the evidence itself: attach the file in "
-        "**Tab 2 → Compelling Evidence Collection**, then open **Vision check** under that exhibit. One upload — "
-        "the finding is recorded against the collected file's SHA-256 in the chain of custody."
-    )
 
 
 # -----------------------------------------------------------------------------
