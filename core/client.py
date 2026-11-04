@@ -5,7 +5,12 @@ Property Management Systems (OPERA, Cloudbeds, Mews), and Building/Hotel Managem
 """
 
 import base64
+import time
+import uuid
 from typing import Dict, Any, Optional, Union
+
+import requests
+
 from .models import NoticeData, FolioData, DisputePacketResponse, SubmissionRecord, OutcomeRecord
 from .extractor import DocumentExtractor
 from .reconciler import Reconciler
@@ -381,3 +386,106 @@ class FolioShield:
             "contents": info["contents"],
         }, user="SDK/API")
         return zip_bytes, info
+
+
+class FolioShieldHTTPClient:
+    """
+    Authenticated HTTP client for the enterprise integration API.
+
+    This class is additive: the local FolioShield SDK above remains unchanged.
+    It sends Bearer credentials, tenant-scoped case requests, idempotency keys,
+    and bounded retries for transient failures. It never logs secrets or payloads.
+    """
+
+    def __init__(self, base_url: str, api_key: str, timeout: int = 30, max_retries: int = 3,
+                 session: Optional[requests.Session] = None):
+        if not base_url:
+            raise ValueError("base_url is required")
+        if not api_key:
+            raise ValueError("api_key is required")
+        self.base_url = base_url.rstrip("/")
+        self._api_key = api_key
+        self.timeout = timeout
+        self.max_retries = max(1, max_retries)
+        self.session = session or requests.Session()
+
+    def _headers(self, idempotency_key: Optional[str] = None) -> Dict[str, str]:
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+            "X-Request-Id": str(uuid.uuid4()),
+        }
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
+        return headers
+
+    def _request(self, method: str, path: str, payload: Optional[Dict[str, Any]] = None,
+                 idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+        url = f"{self.base_url}{path}"
+        last_error: Optional[Exception] = None
+        for attempt in range(self.max_retries):
+            try:
+                response = self.session.request(
+                    method, url, json=payload, headers=self._headers(idempotency_key), timeout=self.timeout)
+                if response.status_code in (429, 502, 503, 504) and attempt < self.max_retries - 1:
+                    time.sleep(min(2 ** attempt, 8))
+                    continue
+                try:
+                    data = response.json()
+                except ValueError:
+                    data = {"status": "error", "error": {"message": "Non-JSON response"}}
+                if response.status_code >= 400:
+                    message = ((data.get("error") or {}).get("message") if isinstance(data, dict) else None) or f"HTTP {response.status_code}"
+                    raise RuntimeError(message)
+                return data
+            except (requests.RequestException, RuntimeError) as exc:
+                last_error = exc
+                if attempt < self.max_retries - 1:
+                    time.sleep(min(2 ** attempt, 8))
+                    continue
+                raise
+        raise RuntimeError(str(last_error) if last_error else "Request failed")
+
+    def create_case(self, case_id: Optional[str] = None, external_system: Optional[str] = None,
+                    external_case_id: Optional[str] = None, external_folio_id: Optional[str] = None,
+                    external_transaction_id: Optional[str] = None, property_id: Optional[str] = None,
+                    notice: Optional[Dict[str, Any]] = None, folio: Optional[Dict[str, Any]] = None,
+                    idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+        return self._request("POST", "/api/v1/integrations/cases", {
+            "case_id": case_id, "external_system": external_system, "external_case_id": external_case_id,
+            "external_folio_id": external_folio_id, "external_transaction_id": external_transaction_id,
+            "property_id": property_id, "notice": notice, "folio": folio,
+        }, idempotency_key=idempotency_key)
+
+    def upload_document(self, case_id: str, document_type: str, filename: str, media_type: str,
+                        data: bytes, evidence_doc_type: Optional[str] = None) -> Dict[str, Any]:
+        return self._request("POST", f"/api/v1/integrations/cases/{case_id}/documents", {
+            "document_type": document_type, "filename": filename, "media_type": media_type,
+            "content_base64": base64.b64encode(data).decode("utf-8"), "evidence_doc_type": evidence_doc_type,
+        })
+
+    def get_case(self, case_id: str) -> Dict[str, Any]:
+        return self._request("GET", f"/api/v1/integrations/cases/{case_id}")
+
+    def reconcile_case(self, case_id: str) -> Dict[str, Any]:
+        return self._request("POST", f"/api/v1/integrations/cases/{case_id}/reconcile", {})
+
+    def draft_case(self, case_id: str, custom_notes: Optional[str] = None) -> Dict[str, Any]:
+        return self._request("POST", f"/api/v1/integrations/cases/{case_id}/draft", {"custom_notes": custom_notes})
+
+    def process_case(self, case_id: str, custom_notes: Optional[str] = None, policy_text: Optional[str] = None) -> Dict[str, Any]:
+        return self._request("POST", f"/api/v1/integrations/cases/{case_id}/process", {
+            "custom_notes": custom_notes, "policy_text": policy_text,
+        })
+
+    def get_audit(self, case_id: str) -> Dict[str, Any]:
+        return self._request("GET", f"/api/v1/integrations/cases/{case_id}/audit")
+
+    def monitoring(self) -> Dict[str, Any]:
+        return self._request("GET", "/api/v1/integrations/monitoring")
+
+    @staticmethod
+    def verify_webhook_signature(secret: str, payload: bytes, timestamp: str, signature: str) -> bool:
+        from .integrations.webhooks import verify_signature
+
+        return verify_signature(secret, payload, timestamp, signature)
