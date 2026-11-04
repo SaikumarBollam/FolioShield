@@ -89,10 +89,206 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown("""
+def get_theme_css(dark_mode: bool = False) -> str:
+    """Returns CSS block styled with the user palette (Navy, Muted Gold, Off-white, Steel Blue, Dark Charcoal)."""
+    if dark_mode:
+        return """
 <style>
     :root {
-        /* User Bespoke Palette */
+        /* Bespoke Palette - Night Mode */
+        --fs-navy: #173B50;
+        --fs-gold: #D5B77A;
+        --fs-offwhite: #F5F5F0;
+        --fs-steelblue: #8FA2AB;
+        --fs-charcoal: #13191D;
+        --fs-card-bg: #22292E;
+        --fs-sidebar-bg: #192025;
+        --fs-border: #3A454D;
+
+        --fs-primary: var(--fs-navy);
+        --fs-accent: var(--fs-gold);
+        --fs-secondary: var(--fs-steelblue);
+        --fs-bg: var(--fs-charcoal);
+        --fs-text: var(--fs-offwhite);
+        --fs-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        --fs-radius: 8px;
+    }
+
+    /* Main Canvas Background */
+    .stApp, [data-testid="stAppViewContainer"] {
+        background-color: var(--fs-charcoal) !important;
+        color: var(--fs-offwhite) !important;
+    }
+
+    /* Headings — Night Mode (Crisp Off-white with Muted Gold accents) */
+    .main-header, h1, .stMarkdown h1 {
+        font-size: 2.2rem !important;
+        font-weight: 700 !important;
+        color: var(--fs-offwhite) !important;
+        margin-bottom: 4px !important;
+        font-family: var(--fs-font) !important;
+        letter-spacing: -0.015em;
+    }
+    h2, .stMarkdown h2 {
+        font-size: 1.45rem !important;
+        font-weight: 700 !important;
+        color: var(--fs-offwhite) !important;
+        border-bottom: 2px solid var(--fs-gold) !important;
+        padding-bottom: 6px !important;
+        margin-top: 20px !important;
+        margin-bottom: 12px !important;
+    }
+
+    /* Subheadings — Muted Gold (#D5B77A) & Steel Blue */
+    .sub-header, p.sub-header {
+        font-size: 1.05rem !important;
+        font-weight: 500 !important;
+        color: var(--fs-steelblue) !important;
+        margin-bottom: 22px !important;
+        line-height: 1.5 !important;
+    }
+    h3, .stMarkdown h3, [data-testid="stSubheader"] {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        color: var(--fs-gold) !important;
+        border-left: 3px solid var(--fs-steelblue) !important;
+        padding-left: 10px !important;
+        margin-top: 18px !important;
+        margin-bottom: 8px !important;
+    }
+    h4, .stMarkdown h4 {
+        font-size: 1.08rem !important;
+        font-weight: 600 !important;
+        color: var(--fs-steelblue) !important;
+        margin-top: 14px !important;
+        margin-bottom: 6px !important;
+    }
+    h5, .stMarkdown h5 {
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
+        color: var(--fs-gold) !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.04em !important;
+        margin-top: 10px !important;
+        margin-bottom: 4px !important;
+    }
+
+    /* Body Text & Paragraphs */
+    p, span, label, div {
+        color: var(--fs-offwhite);
+    }
+
+    /* Metric Cards & Proof Panels (Dark Charcoal surface with Gold accent) */
+    div[data-testid="stMetric"] {
+        background-color: var(--fs-card-bg) !important;
+        border: 1px solid var(--fs-gold) !important;
+        border-top: 3px solid var(--fs-gold) !important;
+        border-radius: var(--fs-radius) !important;
+        padding: 12px !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    }
+    div[data-testid="stMetric"] label, div[data-testid="stMetric"] [data-testid="stMetricLabel"] {
+        color: var(--fs-steelblue) !important;
+        font-weight: 600 !important;
+    }
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+        color: var(--fs-gold) !important;
+        font-weight: 700 !important;
+    }
+    div[data-testid="stExpander"] {
+        border: 1px solid var(--fs-border) !important;
+        border-radius: var(--fs-radius) !important;
+        background-color: var(--fs-card-bg) !important;
+    }
+
+    /* Form Controls & Inputs in Dark Mode */
+    input, textarea, select, [data-baseweb="select"] {
+        background-color: #1A2126 !important;
+        color: var(--fs-offwhite) !important;
+        border-color: var(--fs-border) !important;
+    }
+
+    /* Tabs Styling (Night Mode) */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 6px;
+        background-color: transparent;
+        border-bottom: 2px solid var(--fs-gold);
+    }
+    .stTabs [data-baseweb="tab"] {
+        padding: 10px 18px;
+        border-radius: var(--fs-radius) var(--fs-radius) 0px 0px;
+        font-weight: 600;
+        color: var(--fs-steelblue);
+        background-color: transparent;
+    }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        background-color: var(--fs-card-bg) !important;
+        color: var(--fs-gold) !important;
+        border-bottom: 3px solid var(--fs-gold) !important;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #2D373D;
+        color: var(--fs-gold);
+    }
+
+    /* Badges & Chips */
+    .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: 4px;
+        background-color: #1D262B;
+        color: var(--fs-gold);
+        border: 1px solid var(--fs-gold);
+    }
+
+    /* Buttons */
+    .stButton > button[kind="primary"] {
+        background-color: var(--fs-gold) !important;
+        border: 1px solid var(--fs-gold) !important;
+        color: var(--fs-navy) !important;
+        border-radius: var(--fs-radius) !important;
+        font-weight: 700 !important;
+        box-shadow: 0 1px 4px rgba(213, 183, 122, 0.25);
+    }
+    .stButton > button[kind="primary"]:hover {
+        background-color: #E2CCA0 !important;
+        border-color: #E2CCA0 !important;
+        color: #0E2431 !important;
+    }
+    .stButton > button:not([kind="primary"]) {
+        border: 1px solid var(--fs-steelblue) !important;
+        border-radius: var(--fs-radius) !important;
+        color: var(--fs-offwhite) !important;
+        background-color: var(--fs-card-bg) !important;
+    }
+    .stButton > button:not([kind="primary"]):hover {
+        background-color: #2D373D !important;
+        border-color: var(--fs-gold) !important;
+        color: var(--fs-gold) !important;
+    }
+
+    /* Sidebar in Night Mode */
+    section[data-testid="stSidebar"] {
+        background-color: var(--fs-sidebar-bg) !important;
+        border-right: 1px solid var(--fs-border) !important;
+    }
+    section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {
+        color: var(--fs-gold) !important;
+        border-bottom: none !important;
+        border-left: none !important;
+        padding-left: 0 !important;
+    }
+
+    .fs-brand-logo { max-height: 44px; margin-bottom: 6px; }
+</style>
+"""
+    else:
+        return """
+<style>
+    :root {
+        /* Bespoke Palette - Light Mode */
         --fs-navy: #173B50;        /* Deep Navy: Main Headings, Primary CTA, Key Accents */
         --fs-gold: #D5B77A;        /* Muted Gold: Subheadings, Badges, Borders, Highlights */
         --fs-offwhite: #F5F5F0;    /* Off-white: Canvas & Card Surfaces */
@@ -270,7 +466,11 @@ st.markdown("""
 
     .fs-brand-logo { max-height: 44px; margin-bottom: 6px; }
 </style>
-""", unsafe_allow_html=True)
+"""
+
+
+# Apply dynamic theme based on session state toggle
+st.markdown(get_theme_css(st.session_state.get("dark_mode", False)), unsafe_allow_html=True)
 
 
 # -----------------------------------------------------------------------------
@@ -389,6 +589,8 @@ def load_case(notice: Dict[str, Any], folio: Dict[str, Any], docs: Dict[str, Any
 def init_state() -> None:
     if "audit_logger" in st.session_state:
         return
+    if "dark_mode" not in st.session_state:
+        st.session_state.dark_mode = False
     st.session_state.audit_logger = AuditLogger()
     st.session_state.current_scenario_key = DEFAULT_SCENARIO
     st.session_state.custom_notes = ""
@@ -467,6 +669,12 @@ init_state()
 with st.sidebar:
     st.markdown("## 🛡️ **FolioShield**")
     st.caption("**Hotel Chargeback Defense & Evidence Management**")
+
+    # Dark / Light Mode Toggle
+    is_dark = st.toggle("🌙 Night Mode", value=st.session_state.get("dark_mode", False), key="dark_mode_toggle")
+    if is_dark != st.session_state.get("dark_mode", False):
+        st.session_state.dark_mode = is_dark
+        st.rerun()
 
     # Environment Badge
     if config.is_production:
