@@ -7,6 +7,10 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+import pytest
+
+pytest.importorskip("fastapi")
+pytest.importorskip("starlette")
 from starlette.testclient import TestClient
 
 from core.api_asgi import create_app

@@ -5,6 +5,9 @@ Tests for Relational Repositories (SqlCaseRepository & SqliteLegacyCaseRepositor
 import tempfile
 import unittest
 from pathlib import Path
+import pytest
+
+pytest.importorskip("sqlalchemy")
 
 from core.case_store import CaseConflictError, CaseStore
 from core.infrastructure.database.repositories.sql import SqlCaseRepository

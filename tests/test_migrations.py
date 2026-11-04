@@ -2,9 +2,14 @@
 Tests for Alembic database migrations.
 """
 
+from pathlib import Path
 import tempfile
 import unittest
-from pathlib import Path
+import pytest
+
+pytest.importorskip("alembic")
+pytest.importorskip("sqlalchemy")
+
 from alembic import command
 from alembic.config import Config
 
@@ -13,7 +18,9 @@ class TestDatabaseMigrations(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.db_path = Path(self._tmp.name) / "migration_test.db"
-        self.alembic_cfg = Config("alembic.ini")
+        root = Path(__file__).resolve().parent.parent
+        self.alembic_cfg = Config(str(root / "alembic.ini"))
+        self.alembic_cfg.set_main_option("script_location", str(root / "alembic"))
         self.alembic_cfg.set_main_option("sqlalchemy.url", f"sqlite:///{self.db_path}")
 
     def tearDown(self):
