@@ -1,0 +1,191 @@
+1
+00:00:01,285 --> 00:00:05,747
+Hotels lose thousands each month to false card-not-present chargebacks while
+
+2
+00:00:05,787 --> 00:00:10,045
+stay evidence sits scattered across folios terminals and lock logs
+
+3
+00:00:10,257 --> 00:00:13,816
+FolioShield uses an outside-in document-first workflow
+
+4
+00:00:13,975 --> 00:00:17,940
+With synthetic hotel data we upload a Visa 10.4 dispute
+
+5
+00:00:17,980 --> 00:00:20,003
+notice and guest folio CSV
+
+6
+00:00:20,236 --> 00:00:24,261
+then verify and save payment metadata into an audited case
+
+7
+00:00:26,874 --> 00:00:31,612
+In Stay and Billing Verification FolioShield pairs Visa 10.4 defense
+
+8
+00:00:31,652 --> 00:00:34,215
+guidance with the cardholder's exact quoted claim
+
+9
+00:00:34,374 --> 00:00:38,338
+Its deterministic reconciliation engine executes ten mathematical proofs
+
+10
+00:00:38,378 --> 00:00:41,442
+confirming folio footing to a zero balance three nights at
+
+11
+00:00:41,482 --> 00:00:45,232
+three hundred twenty dollars plus tax card last-four 4821
+
+12
+00:00:45,497 --> 00:00:48,008
+authorization AP98231
+
+13
+00:00:48,188 --> 00:00:50,169
+and one hundred percent identity confidence
+
+14
+00:00:52,874 --> 00:00:56,637
+Next we bulk-import ten synthetic stay exhibits including the signed
+
+15
+00:00:56,677 --> 00:00:58,849
+registration card EMV chip receipt
+
+16
+00:00:59,082 --> 00:01:00,321
+Onity keycard audit
+
+17
+00:01:00,469 --> 00:01:01,296
+ID log
+
+18
+00:01:01,455 --> 00:01:02,779
+and Wi-Fi CSV
+
+19
+00:01:02,948 --> 00:01:07,789
+Every file is SHA-256 hashed into content-addressed storage
+
+20
+00:01:07,938 --> 00:01:13,480
+Recording dining slip POS-9812 for eighty-seven dollars and seventy cents
+
+21
+00:01:13,520 --> 00:01:17,821
+satisfies all validators achieving one hundred percent evidence completeness
+
+22
+00:01:20,874 --> 00:01:25,124
+In the Dispute Response Studio FolioShield supports Meta Llama 3.3
+
+23
+00:01:25,164 --> 00:01:29,116
+70B via Direct Meta Groq or Fireworks AI
+
+24
+00:01:29,349 --> 00:01:32,113
+plus a deterministic local fallback active here offline
+
+25
+00:01:32,262 --> 00:01:36,840
+Adding verified front-desk notes drafts a five-section rebuttal citing Exhibits
+
+26
+00:01:36,880 --> 00:01:37,950
+A through I
+
+27
+00:01:38,205 --> 00:01:41,724
+while flagging a missing booking date instead of fabricating unverified
+
+28
+00:01:41,764 --> 00:01:42,463
+facts
+
+29
+00:01:46,885 --> 00:01:50,171
+The Submission Readiness Gate blocks sign-off until that placeholder is
+
+30
+00:01:50,211 --> 00:01:50,857
+resolved
+
+31
+00:01:51,027 --> 00:01:54,747
+Once manager Elena Vance enters the confirmed September twenty-eighth booking
+
+32
+00:01:54,787 --> 00:01:56,789
+timestamp the gate clears
+
+33
+00:01:56,948 --> 00:02:00,637
+Her explicit Manager Sign-Off locks the case under a canonical
+
+34
+00:02:00,677 --> 00:02:03,124
+SHA-256 fingerprint
+
+35
+00:02:03,272 --> 00:02:06,556
+ensuring automated workflows never fabricate human approval
+
+36
+00:02:08,885 --> 00:02:12,921
+With approval locked ReportLab compiles a three-page Bank Evidence Packet
+
+37
+00:02:13,122 --> 00:02:14,319
+signed rebuttal cover
+
+38
+00:02:14,467 --> 00:02:15,781
+itemized folio audit
+
+39
+00:02:15,982 --> 00:02:19,510
+and an evidence annex with a SHA-256 custody seal
+
+40
+00:02:19,679 --> 00:02:24,025
+Selecting Chase Paymentech passes all nine pre-submission checks and packages
+
+41
+00:02:24,065 --> 00:02:27,838
+a validated ZIP bundle converting CSV and email exhibits to
+
+42
+00:02:27,878 --> 00:02:29,923
+PDF for staff portal upload
+
+43
+00:02:36,785 --> 00:02:41,575
+Every step is verified in a hash-chained SHA-256 audit log
+
+44
+00:02:41,615 --> 00:02:42,897
+with custody manifests
+
+45
+00:02:43,067 --> 00:02:46,626
+Enterprise-readiness adds FastAPI SQLAlchemy
+
+46
+00:02:46,785 --> 00:02:49,952
+S3 storage webhooks and agents
+
+47
+00:02:50,111 --> 00:02:53,427
+while human SSO and full multi-tenancy remain planned
+
+48
+00:02:53,628 --> 00:02:56,160
+with no auto-submission or claimed certifications
