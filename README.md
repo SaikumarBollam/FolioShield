@@ -1,5 +1,10 @@
 # 🛡️ FolioShield — Hotel Chargeback Defense & Evidence Management
 
+
+[![FolioShield Product Demo](artifacts/product-demo/thumbnail-1280x720.png)](https://www.youtube.com/watch?v=nKVVwpTXkwY)
+
+> 📺 **Watch the 3-Minute Live Product Demo:** [YouTube Video](https://www.youtube.com/watch?v=nKVVwpTXkwY) · [Artifacts & Storyboard](artifacts/product-demo/)
+
 FolioShield helps hotels respond to credit-card chargebacks by turning bank dispute notices, guest folios, and front-desk evidence into mathematically verified, evidence-backed dispute packets.
 
 It follows an **outside-in, document-first workflow**: hotels do not need a direct PMS integration to get started. Staff can upload the documents they already have, review extracted facts, collect supporting evidence, approve a rebuttal, and generate a submission-ready packet. Enterprise integrations are available for hotels that want API, agent-based, or embedded delivery.

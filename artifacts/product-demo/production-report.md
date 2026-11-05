@@ -1,14 +1,14 @@
 # FolioShield — Enterprise Product Demo Production & Validation Report
 
 ## 1. Executive Summary
-This report documents the autonomous inspection, live execution, screen/frame recording, audio mastering, compositing, and technical validation of the **exact 3-minute (`180.000s`) enterprise SaaS product demo video** for **FolioShield** (`https://github.com/SaikumarBollam/FolioShield`).
+This report documents the autonomous inspection, live execution, screen/frame recording, audio mastering, compositing, and technical validation of the **exact 3-minute (`180.000s`) enterprise SaaS product demo video** for **FolioShield** (`https://github.com/SaikumarBollam/FolioShield | Live Video: https://www.youtube.com/watch?v=nKVVwpTXkwY`).
 
 Every frame of application UI in `folioshield-enterprise-demo.mp4` was captured from a **genuine running FolioShield Streamlit instance** (`app.py`) executing real repository code against **100% synthetic hotel transaction data** in an isolated runtime directory. Zero UI screens, outputs, hashes, or results were mocked or fabricated.
 
 ---
 
 ## 2. Repository & Branch Inspection (`feature/enterprise-readiness`)
-- **Repository**: `https://github.com/SaikumarBollam/FolioShield`
+- **Repository**: `https://github.com/SaikumarBollam/FolioShield | Live Video: https://www.youtube.com/watch?v=nKVVwpTXkwY`
 - **Branch Lineage Verified**:
   - `feature/enterprise-readiness` was developed across commits `4803e02` (*"Harden enterprise architecture, storage, API, and migration foundations"*), `5e7203d`, and `8380d79` (`refs/pull/2/head`), and merged into `main` via PR #2 (`35c072a`).
   - Subsequent `main` commits added semantic enterprise design tokens and WCAG 2.2 AA Light/Night themes (`ui/theme.py`), culminating in tag `v1.2.0` (`2faf4db`, local `HEAD`).
